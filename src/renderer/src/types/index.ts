@@ -25,6 +25,7 @@ export interface CatalogueItem {
   unite: string
   prix_unitaire: number
   categorie?: string
+  is_favorite?: number
   created_at: string
   updated_at: string
 }

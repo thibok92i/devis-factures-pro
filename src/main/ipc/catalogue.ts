@@ -89,4 +89,20 @@ export function registerCatalogueHandlers(): void {
   ipcMain.handle('catalogue:categories', () => {
     return queryAll('SELECT DISTINCT categorie FROM catalogue WHERE categorie IS NOT NULL ORDER BY categorie').map((r) => r.categorie)
   })
+
+  // Toggle favorite status
+  ipcMain.handle('catalogue:toggleFavorite', (_event, id: string) => {
+    try {
+      const validId = requireUUID(id, 'ID article')
+      const item = queryOne('SELECT is_favorite FROM catalogue WHERE id = ?', [validId]) as { is_favorite: number } | undefined
+      if (!item) return { success: false, error: 'Article introuvable' }
+      const newValue = item.is_favorite ? 0 : 1
+      execute("UPDATE catalogue SET is_favorite = ?, updated_at = datetime('now') WHERE id = ?", [newValue, validId])
+      saveToFile()
+      return { success: true, is_favorite: newValue }
+    } catch (err) {
+      if (err instanceof ValidationError) return { success: false, error: err.message }
+      throw err
+    }
+  })
 }

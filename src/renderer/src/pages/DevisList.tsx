@@ -199,7 +199,7 @@ export default function DevisList() {
                       <button onClick={() => handleExportPdf(d.id)} className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-primary transition-colors" title="Exporter PDF">
                         <Download className="h-4 w-4" />
                       </button>
-                      {d.statut === 'accepte' && (
+                      {d.statut !== 'refuse' && (
                         <button onClick={() => handleConvertToFacture(d.id)} className="rounded p-1.5 text-muted-foreground hover:bg-accent/10 hover:text-accent transition-colors" title="Convertir en facture">
                           <ArrowRight className="h-4 w-4" />
                         </button>

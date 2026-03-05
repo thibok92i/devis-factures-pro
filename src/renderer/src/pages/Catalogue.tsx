@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, Search, Pencil, Trash2, X, Package, Wrench } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, X, Package, Wrench, Star } from 'lucide-react'
 import { useApiData, useApiCall } from '../hooks/useApi'
 import { useToast } from '../components/Toast'
 import { formatCHF } from '../utils/format'
@@ -131,6 +131,11 @@ export default function Catalogue() {
     refresh()
   }
 
+  const handleToggleFavorite = async (id: string) => {
+    await execute(() => window.api.catalogue.toggleFavorite(id))
+    refresh()
+  }
+
   const handleDelete = async (id: string) => {
     if (confirm('Supprimer cet article ?')) {
       await execute(() => window.api.catalogue.delete(id))
@@ -216,6 +221,9 @@ export default function Catalogue() {
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="font-medium text-sm text-foreground">{formatCHF(item.prix_unitaire)}</span>
+                        <button onClick={() => handleToggleFavorite(item.id)} className={`rounded p-1.5 transition-colors ${item.is_favorite ? 'text-yellow-500' : 'text-muted-foreground/30 hover:text-yellow-500'}`} title={item.is_favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}>
+                          <Star className={`h-4 w-4 ${item.is_favorite ? 'fill-yellow-500' : ''}`} />
+                        </button>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => setEditing(item)} className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-primary transition-colors">
                             <Pencil className="h-3.5 w-3.5" />

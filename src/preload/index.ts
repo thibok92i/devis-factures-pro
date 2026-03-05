@@ -55,7 +55,8 @@ const api = {
       ipcRenderer.invoke('catalogue:update', id, data),
     delete: (id: string) => ipcRenderer.invoke('catalogue:delete', id),
     search: (query: string) => ipcRenderer.invoke('catalogue:search', query),
-    categories: () => ipcRenderer.invoke('catalogue:categories')
+    categories: () => ipcRenderer.invoke('catalogue:categories'),
+    toggleFavorite: (id: string) => ipcRenderer.invoke('catalogue:toggleFavorite', id)
   },
 
   // Settings

@@ -194,6 +194,13 @@ export function createSchema(db: Database): void {
     INSERT OR IGNORE INTO settings (key, value) VALUES ('delai_paiement_facture', '30');
   `)
 
+  // Migration: add is_favorite to catalogue (Feature 5)
+  try {
+    db.run(`ALTER TABLE catalogue ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0`)
+  } catch {
+    // Column already exists, ignore
+  }
+
   // --- Catalogue par défaut : Matériaux ---
   db.run(`INSERT OR IGNORE INTO catalogue (id, reference, designation, type, unite, prix_unitaire, categorie, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`, ['default-BOIS-001', 'BOIS-001', 'Panneau chêne massif 20mm', 'materiau', 'm²', 89.0, 'Bois massif']);
   db.run(`INSERT OR IGNORE INTO catalogue (id, reference, designation, type, unite, prix_unitaire, categorie, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`, ['default-BOIS-002', 'BOIS-002', 'Panneau sapin 3 plis 27mm', 'materiau', 'm²', 52.0, 'Bois massif']);

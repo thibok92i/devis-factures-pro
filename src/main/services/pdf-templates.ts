@@ -48,7 +48,11 @@ export function generateDevisHtml(
 ): string {
   const linesHtml = lignes
     .map(
-      (l) => `
+      (l) => {
+        if (l.description === '__SECTION__') {
+          return `<tr><td colspan="6" style="background: #eef2ff; padding: 8px 10px; font-weight: bold; font-size: 10pt; color: #2563eb; border-bottom: 2px solid #2563eb;">${l.designation}</td></tr>`
+        }
+        return `
     <tr>
       <td>${l.designation}</td>
       <td>${l.description || ''}</td>
@@ -58,6 +62,7 @@ export function generateDevisHtml(
       <td class="text-right">${formatCHF(l.total as number)}</td>
     </tr>
   `
+      }
     )
     .join('')
 
@@ -131,7 +136,11 @@ export function generateFactureHtml(
 ): string {
   const linesHtml = lignes
     .map(
-      (l) => `
+      (l) => {
+        if (l.description === '__SECTION__') {
+          return `<tr><td colspan="6" style="background: #f0fdf4; padding: 8px 10px; font-weight: bold; font-size: 10pt; color: #059669; border-bottom: 2px solid #059669;">${l.designation}</td></tr>`
+        }
+        return `
     <tr>
       <td>${l.designation}</td>
       <td>${l.description || ''}</td>
@@ -141,6 +150,7 @@ export function generateFactureHtml(
       <td class="text-right">${formatCHF(l.total as number)}</td>
     </tr>
   `
+      }
     )
     .join('')
 

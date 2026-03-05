@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2, Save, Download, ArrowRight, Search, ChevronUp, ChevronDown, Check, Package, Calculator, X } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Save, Download, ArrowRight, Search, ChevronUp, ChevronDown, Check, Package, Calculator, X, Copy, GripVertical, Star, FileInput, RefreshCw, Layers } from 'lucide-react'
 import { useToast } from '../components/Toast'
-import { formatCHF, devisStatutLabel, devisStatutColor } from '../utils/format'
-import type { DevisDetail, DevisLigne, CatalogueItem, Forfait, ForfaitCalculated } from '../types'
+import { formatCHF, formatDate, devisStatutLabel, devisStatutColor, clientDisplayName } from '../utils/format'
+import ClientSearchInput from '../components/ClientSearchInput'
+import type { DevisDetail, DevisLigne, CatalogueItem, Forfait, ForfaitCalculated, DevisWithClient, Client } from '../types'
 
 interface EditableLigne {
   id?: string
@@ -36,6 +37,19 @@ export default function DevisEditor() {
   const [calcW, setCalcW] = useState('')
   const [calcH, setCalcH] = useState('')
   const [calcPerte, setCalcPerte] = useState('10')
+  // Drag & drop
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  // Client swap
+  const [showClientSwap, setShowClientSwap] = useState(false)
+  const [allClients, setAllClients] = useState<Client[]>([])
+  // Import from old devis
+  const [showImportDevis, setShowImportDevis] = useState(false)
+  const [importDevisList, setImportDevisList] = useState<DevisWithClient[]>([])
+  const [importSearch, setImportSearch] = useState('')
+  const [importSelectedDevis, setImportSelectedDevis] = useState<string | null>(null)
+  const [importLignes, setImportLignes] = useState<DevisLigne[]>([])
+  const [importChecked, setImportChecked] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     if (!id || id === 'new') return
@@ -64,8 +78,23 @@ export default function DevisEditor() {
   const montantTva = apresRemise * (tauxTva / 100)
   const total = apresRemise + montantTva
 
+  // --- Section helper ---
+  const isSection = (ligne: EditableLigne) => ligne.description === '__SECTION__'
+
   const addLine = () => {
     setLignes([...lignes, { designation: '', description: '', unite: 'pce', quantite: 1, prix_unitaire: 0 }])
+  }
+
+  const addSection = () => {
+    setLignes([...lignes, { designation: 'Nouvelle section', description: '__SECTION__', unite: 'pce', quantite: 0, prix_unitaire: 0 }])
+  }
+
+  const duplicateLine = (index: number) => {
+    const source = lignes[index]
+    const copy: EditableLigne = { ...source, id: undefined }
+    const updated = [...lignes]
+    updated.splice(index + 1, 0, copy)
+    setLignes(updated)
   }
 
   const addFromCatalogue = (item: CatalogueItem) => {
@@ -105,6 +134,95 @@ export default function DevisEditor() {
     const updated = [...lignes]
     ;[updated[index], updated[newIndex]] = [updated[newIndex], updated[index]]
     setLignes(updated)
+  }
+
+  // --- Drag & drop handlers ---
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDragIndex(index)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(index))
+  }
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverIndex(index)
+  }
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault()
+    if (dragIndex === null || dragIndex === targetIndex) {
+      setDragIndex(null)
+      setDragOverIndex(null)
+      return
+    }
+    const updated = [...lignes]
+    const [moved] = updated.splice(dragIndex, 1)
+    updated.splice(targetIndex, 0, moved)
+    setLignes(updated)
+    setDragIndex(null)
+    setDragOverIndex(null)
+  }
+  const handleDragEnd = () => {
+    setDragIndex(null)
+    setDragOverIndex(null)
+  }
+
+  // --- Client swap ---
+  const openClientSwap = async () => {
+    const clients = await window.api.clients.list()
+    setAllClients(clients)
+    setShowClientSwap(true)
+  }
+  const handleClientSwap = async (clientId: string) => {
+    if (!devis) return
+    try {
+      await window.api.devis.update(devis.id, {
+        client_id: clientId,
+        date: devis.date,
+        validite: devis.validite,
+        statut: devis.statut,
+        notes: devis.notes || '',
+        conditions: devis.conditions || ''
+      })
+      const updated = await window.api.devis.get(devis.id)
+      setDevis(updated)
+      setShowClientSwap(false)
+      toast.success('Client modifié')
+    } catch {
+      toast.error('Erreur lors du changement de client')
+    }
+  }
+
+  // --- Import from old devis ---
+  const openImportDevis = async () => {
+    const list = await window.api.devis.list()
+    setImportDevisList(list.filter((d: DevisWithClient) => d.id !== id))
+    setImportSearch('')
+    setImportSelectedDevis(null)
+    setImportLignes([])
+    setImportChecked(new Set())
+    setShowImportDevis(true)
+  }
+  const handleImportSelectDevis = async (devisId: string) => {
+    const detail = await window.api.devis.get(devisId)
+    const lines = (detail.lignes || []) as DevisLigne[]
+    setImportLignes(lines)
+    setImportChecked(new Set(lines.map((_: DevisLigne, i: number) => i)))
+    setImportSelectedDevis(devisId)
+  }
+  const handleImportConfirm = () => {
+    const newLignes: EditableLigne[] = importLignes
+      .filter((_: DevisLigne, i: number) => importChecked.has(i))
+      .map((l: DevisLigne) => ({
+        catalogue_item_id: l.catalogue_item_id || undefined,
+        designation: l.designation,
+        description: l.description || '',
+        unite: l.unite,
+        quantite: l.quantite,
+        prix_unitaire: l.prix_unitaire
+      }))
+    setLignes((prev) => [...prev, ...newLignes])
+    setShowImportDevis(false)
+    toast.success(`${newLignes.length} ligne${newLignes.length > 1 ? 's' : ''} importée${newLignes.length > 1 ? 's' : ''}`)
   }
 
   const handleSave = async () => {
@@ -299,8 +417,11 @@ export default function DevisEditor() {
           </button>
           <div>
             <h1 className="page-title mb-0">Devis {devis.numero}</h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground flex items-center gap-1">
               {devis.client_entreprise || `${devis.client_prenom || ''} ${devis.client_nom}`}
+              <button onClick={openClientSwap} className="rounded p-0.5 text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors" title="Changer de client">
+                <RefreshCw className="h-3.5 w-3.5" />
+              </button>
             </p>
           </div>
           <span className={`badge ${devisStatutColor(devis.statut)}`}>{devisStatutLabel(devis.statut)}</span>
@@ -315,7 +436,7 @@ export default function DevisEditor() {
               <button onClick={() => handleStatut('refuse')} className="btn-danger">Refusé</button>
             </>
           )}
-          {devis.statut === 'accepte' && (
+          {devis.statut !== 'refuse' && (
             <button onClick={handleConvertToFacture} className="btn-success">
               <ArrowRight className="h-4 w-4" />
               Facturer
@@ -352,15 +473,76 @@ export default function DevisEditor() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {lignes.map((ligne, index) => (
-              <tr key={index} className="hover:bg-muted/30 transition-colors">
+            {lignes.map((ligne, index) => {
+              // --- Section separator row ---
+              if (isSection(ligne)) {
+                return (
+                  <tr
+                    key={index}
+                    className={`transition-colors ${dragOverIndex === index ? 'border-t-2 border-primary' : ''}`}
+                    style={{ background: 'hsl(var(--primary) / 0.06)' }}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDrop={(e) => handleDrop(e, index)}
+                  >
+                    <td className="px-1 py-1.5 text-center">
+                      <div
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragEnd={handleDragEnd}
+                        className="cursor-grab active:cursor-grabbing rounded p-0.5 text-muted-foreground/40 hover:text-foreground transition-colors"
+                      >
+                        <GripVertical className="h-4 w-4" />
+                      </div>
+                    </td>
+                    <td colSpan={5} className="px-3 py-1.5">
+                      <div className="flex items-center gap-2">
+                        <Layers className="h-4 w-4 text-primary flex-shrink-0" />
+                        <input
+                          className="input text-sm font-bold flex-1"
+                          style={{ background: 'transparent', border: 'none', color: 'hsl(var(--primary))' }}
+                          value={ligne.designation}
+                          onChange={(e) => updateLine(index, 'designation', e.target.value)}
+                          placeholder="Nom de la section"
+                        />
+                      </div>
+                    </td>
+                    <td className="px-3 py-1.5 text-center">
+                      <div className="flex gap-0.5 justify-center">
+                        <button onClick={() => duplicateLine(index)} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-primary transition-colors" title="Dupliquer">
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={() => removeLine(index)} className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors" title="Supprimer">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              }
+
+              // --- Normal line row ---
+              return (
+              <tr
+                key={index}
+                className={`hover:bg-muted/30 transition-colors ${dragOverIndex === index ? 'border-t-2 border-primary' : ''} ${dragIndex === index ? 'opacity-40' : ''}`}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDrop={(e) => handleDrop(e, index)}
+              >
                 <td className="px-1 py-1.5 text-center">
-                  <div className="flex flex-col">
+                  <div className="flex flex-col items-center">
+                    <div
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragEnd={handleDragEnd}
+                      className="cursor-grab active:cursor-grabbing rounded p-0.5 text-muted-foreground/30 hover:text-foreground transition-colors mb-0.5"
+                    >
+                      <GripVertical className="h-3.5 w-3.5" />
+                    </div>
                     <button onClick={() => moveLine(index, 'up')} disabled={index === 0} className="rounded p-0.5 text-muted-foreground/40 hover:text-foreground disabled:opacity-30 transition-colors">
-                      <ChevronUp className="h-3.5 w-3.5" />
+                      <ChevronUp className="h-3 w-3" />
                     </button>
                     <button onClick={() => moveLine(index, 'down')} disabled={index === lignes.length - 1} className="rounded p-0.5 text-muted-foreground/40 hover:text-foreground disabled:opacity-30 transition-colors">
-                      <ChevronDown className="h-3.5 w-3.5" />
+                      <ChevronDown className="h-3 w-3" />
                     </button>
                   </div>
                 </td>
@@ -440,12 +622,18 @@ export default function DevisEditor() {
                   {formatCHF(ligne.quantite * ligne.prix_unitaire)}
                 </td>
                 <td className="px-3 py-1.5 text-center">
-                  <button onClick={() => removeLine(index)} className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex gap-0.5 justify-center">
+                    <button onClick={() => duplicateLine(index)} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-primary transition-colors" title="Dupliquer">
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => removeLine(index)} className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors" title="Supprimer">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
 
@@ -461,6 +649,14 @@ export default function DevisEditor() {
           <button onClick={openForfaitModal} className="btn-secondary text-sm" style={{ borderColor: 'hsl(var(--primary) / 0.3)', color: 'hsl(var(--primary))' }}>
             <Package className="h-4 w-4" />
             Forfait / Pack
+          </button>
+          <button onClick={openImportDevis} className="btn-secondary text-sm">
+            <FileInput className="h-4 w-4" />
+            Depuis un devis
+          </button>
+          <button onClick={addSection} className="btn-secondary text-sm">
+            <Layers className="h-4 w-4" />
+            Section
           </button>
         </div>
       </div>
@@ -678,6 +874,164 @@ export default function DevisEditor() {
         </div>
       )}
 
+      {/* Client swap modal */}
+      {showClientSwap && (
+        <div className="modal-overlay">
+          <div className="modal w-full max-w-md">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-foreground">
+                <RefreshCw className="h-5 w-5 inline-block mr-2 text-primary" />
+                Changer de client
+              </h3>
+              <button onClick={() => setShowClientSwap(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Le devis sera attribué au nouveau client. Les lignes restent inchangées.
+            </p>
+            <ClientSearchInput
+              clients={allClients}
+              value={null}
+              onChange={(clientId) => handleClientSwap(clientId)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Import from old devis modal */}
+      {showImportDevis && (
+        <div className="modal-overlay">
+          <div className="modal w-full max-w-3xl max-h-[85vh] flex flex-col">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-foreground">
+                <FileInput className="h-5 w-5 inline-block mr-2 text-primary" />
+                Importer depuis un devis
+              </h3>
+              <button onClick={() => setShowImportDevis(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {!importSelectedDevis ? (
+              /* Step 1: Choose a devis */
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <div className="search-bar mb-3">
+                  <Search className="search-icon" />
+                  <input className="search-input" placeholder="Rechercher par numéro ou client..." value={importSearch} onChange={(e) => setImportSearch(e.target.value)} autoFocus />
+                </div>
+                <div className="overflow-y-auto flex-1 space-y-1">
+                  {importDevisList
+                    .filter((d) => {
+                      if (!importSearch) return true
+                      const q = importSearch.toLowerCase()
+                      const name = clientDisplayName({ nom: d.client_nom, prenom: d.client_prenom, entreprise: d.client_entreprise })
+                      return d.numero.toLowerCase().includes(q) || name.toLowerCase().includes(q)
+                    })
+                    .map((d) => (
+                      <button
+                        key={d.id}
+                        onClick={() => handleImportSelectDevis(d.id)}
+                        className="w-full text-left rounded-lg border border-border p-3 hover:border-primary/50 hover:bg-primary/5 transition-all"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="font-medium text-primary">{d.numero}</span>
+                            <span className="text-sm text-foreground ml-2">
+                              {clientDisplayName({ nom: d.client_nom, prenom: d.client_prenom, entreprise: d.client_entreprise })}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-medium text-foreground">{formatCHF(d.total)}</div>
+                            <div className="text-xs text-muted-foreground">{formatDate(d.date)}</div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            ) : (
+              /* Step 2: Select lines to import */
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <div className="flex items-center gap-3 mb-3 p-3 rounded-lg" style={{ background: 'hsl(var(--primary) / 0.05)' }}>
+                  <button onClick={() => { setImportSelectedDevis(null); setImportLignes([]) }} className="text-muted-foreground hover:text-foreground transition-colors">
+                    <ArrowLeft className="h-4 w-4" />
+                  </button>
+                  <span className="text-sm font-medium text-foreground">
+                    {importLignes.length} ligne{importLignes.length > 1 ? 's' : ''} disponible{importLignes.length > 1 ? 's' : ''}
+                  </span>
+                  <div className="ml-auto">
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={importChecked.size === importLignes.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setImportChecked(new Set(importLignes.map((_: DevisLigne, i: number) => i)))
+                          } else {
+                            setImportChecked(new Set())
+                          }
+                        }}
+                        className="rounded border-border"
+                      />
+                      Tout sélectionner
+                    </label>
+                  </div>
+                </div>
+                <div className="overflow-y-auto flex-1 border border-border rounded-lg">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border" style={{ background: 'hsl(var(--muted) / 0.5)' }}>
+                        <th className="px-3 py-2 w-8"></th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Désignation</th>
+                        <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground">Unité</th>
+                        <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Qté</th>
+                        <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Prix unit.</th>
+                        <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {importLignes.map((l: DevisLigne, i: number) => (
+                        <tr key={i} className={`hover:bg-muted/30 ${importChecked.has(i) ? '' : 'opacity-40'}`}>
+                          <td className="px-3 py-1.5 text-center">
+                            <input
+                              type="checkbox"
+                              checked={importChecked.has(i)}
+                              onChange={(e) => {
+                                const next = new Set(importChecked)
+                                if (e.target.checked) next.add(i); else next.delete(i)
+                                setImportChecked(next)
+                              }}
+                              className="rounded border-border"
+                            />
+                          </td>
+                          <td className="px-3 py-1.5 text-foreground">
+                            {l.description === '__SECTION__' ? <span className="font-bold text-primary">{l.designation}</span> : l.designation}
+                          </td>
+                          <td className="px-3 py-1.5 text-center text-muted-foreground">{l.unite}</td>
+                          <td className="px-3 py-1.5 text-right font-medium">{l.quantite}</td>
+                          <td className="px-3 py-1.5 text-right text-muted-foreground">{formatCHF(l.prix_unitaire)}</td>
+                          <td className="px-3 py-1.5 text-right font-medium text-foreground">{formatCHF(l.total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    {importChecked.size} ligne{importChecked.size > 1 ? 's' : ''} sélectionnée{importChecked.size > 1 ? 's' : ''}
+                  </div>
+                  <button onClick={handleImportConfirm} disabled={importChecked.size === 0} className="btn-primary">
+                    <Plus className="h-4 w-4" />
+                    Importer {importChecked.size} ligne{importChecked.size > 1 ? 's' : ''}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Catalogue picker modal — multi-sélection */}
       {showCatalogue && (
         <div className="modal-overlay">
@@ -694,33 +1048,53 @@ export default function DevisEditor() {
               <input className="search-input" placeholder="Rechercher un article..." value={catalogueSearch} onChange={(e) => setCatalogueSearch(e.target.value)} autoFocus />
             </div>
             <div className="overflow-y-auto flex-1">
-              {filteredCatalogue.map((item) => {
-                const alreadyAdded = lignesCatalogueIds.has(item.id)
+              {/* Favorites first */}
+              {(() => {
+                const favs = filteredCatalogue.filter((item) => item.is_favorite)
+                const others = filteredCatalogue.filter((item) => !item.is_favorite)
+                const renderItem = (item: CatalogueItem) => {
+                  const alreadyAdded = lignesCatalogueIds.has(item.id)
+                  return (
+                    <div key={item.id} className={`flex w-full items-center justify-between rounded-lg px-3 py-2 transition-colors ${alreadyAdded ? 'bg-primary/5' : 'hover:bg-muted/50'}`}>
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {item.is_favorite && <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500 flex-shrink-0" />}
+                        {alreadyAdded && <Check className="h-4 w-4 text-primary flex-shrink-0" />}
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-foreground truncate">{item.designation}</div>
+                          <div className="text-xs text-muted-foreground">{item.reference} - {item.type === 'materiau' ? 'Matériau' : "Main d'oeuvre"} - {item.categorie || 'Sans catégorie'}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-foreground">{formatCHF(item.prix_unitaire)}</div>
+                          <div className="text-xs text-muted-foreground">/{item.unite}</div>
+                        </div>
+                        <button
+                          onClick={() => addFromCatalogue(item)}
+                          className="rounded-lg p-1.5 text-primary hover:bg-primary/10 transition-colors"
+                          title="Ajouter au devis"
+                        >
+                          <Plus className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                }
                 return (
-                  <div key={item.id} className={`flex w-full items-center justify-between rounded-lg px-3 py-2 transition-colors ${alreadyAdded ? 'bg-primary/5' : 'hover:bg-muted/50'}`}>
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      {alreadyAdded && <Check className="h-4 w-4 text-primary flex-shrink-0" />}
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium text-foreground truncate">{item.designation}</div>
-                        <div className="text-xs text-muted-foreground">{item.reference} - {item.type === 'materiau' ? 'Matériau' : "Main d'oeuvre"} - {item.categorie || 'Sans catégorie'}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <div className="text-right">
-                        <div className="text-sm font-medium text-foreground">{formatCHF(item.prix_unitaire)}</div>
-                        <div className="text-xs text-muted-foreground">/{item.unite}</div>
-                      </div>
-                      <button
-                        onClick={() => addFromCatalogue(item)}
-                        className="rounded-lg p-1.5 text-primary hover:bg-primary/10 transition-colors"
-                        title="Ajouter au devis"
-                      >
-                        <Plus className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </div>
+                  <>
+                    {favs.length > 0 && (
+                      <>
+                        <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-yellow-600 flex items-center gap-1">
+                          <Star className="h-3 w-3 fill-yellow-500" /> Favoris
+                        </div>
+                        {favs.map(renderItem)}
+                        {others.length > 0 && <div className="border-t border-border my-1" />}
+                      </>
+                    )}
+                    {others.map(renderItem)}
+                  </>
                 )
-              })}
+              })()}
               {filteredCatalogue.length === 0 && (
                 <p className="py-8 text-center text-sm text-muted-foreground">Aucun article trouvé</p>
               )}

@@ -41,10 +41,17 @@ export function registerDevisHandlers(): void {
       const nextNum = counter.value + 1
       const numero = `D-${String(nextNum).padStart(4, '0')}`
       execute("UPDATE counters SET value = ? WHERE name = 'devis'", [nextNum])
-      execute(
+      // Feature 3: Auto-fill conditions from settings if not provided
+    let conditions = v.conditions
+    if (!conditions) {
+      const setting = queryOne("SELECT value FROM settings WHERE key = 'conditions_devis'") as { value: string } | undefined
+      if (setting?.value) conditions = setting.value
+    }
+
+    execute(
         `INSERT INTO devis (id, numero, client_id, date, validite, statut, notes, conditions)
          VALUES (?, ?, ?, ?, ?, 'brouillon', ?, ?)`,
-        [id, numero, v.client_id, v.date, v.validite, v.notes, v.conditions]
+        [id, numero, v.client_id, v.date, v.validite, v.notes, conditions]
       )
       saveToFile()
       return { id, numero }
