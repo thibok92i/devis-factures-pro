@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Pencil, Trash2, X, Eye } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, X, Phone, Mail, MapPin } from 'lucide-react'
 import { useApiData, useApiCall } from '../hooks/useApi'
 import { useToast } from '../components/Toast'
 import { clientDisplayName } from '../utils/format'
@@ -33,11 +33,11 @@ function ClientForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="card w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div className="modal-overlay">
+      <div className="modal w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">{client ? 'Modifier le client' : 'Nouveau client'}</h3>
-          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600">
+          <h3 className="text-lg font-semibold text-foreground">{client ? 'Modifier le client' : 'Nouveau client'}</h3>
+          <button onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -141,10 +141,18 @@ export default function Clients() {
     }
   }
 
+  const getInitials = (client: Client) => {
+    if (client.entreprise) return client.entreprise.substring(0, 2).toUpperCase()
+    return ((client.prenom?.[0] || '') + (client.nom?.[0] || '')).toUpperCase() || '?'
+  }
+
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Clients</h1>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Clients</h1>
+          <p className="page-subtitle">{(clients || []).length} client{(clients || []).length > 1 ? 's' : ''} au total</p>
+        </div>
         <button onClick={() => setCreating(true)} className="btn-primary">
           <Plus className="h-4 w-4" />
           Nouveau client
@@ -152,65 +160,83 @@ export default function Clients() {
       </div>
 
       {/* Search */}
-      <div className="mb-4 relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+      <div className="search-bar mb-6">
+        <Search className="search-icon" />
         <input
-          className="input pl-10"
+          className="search-input"
           placeholder="Rechercher un client..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
 
-      {/* Client list */}
-      <div className="card overflow-hidden p-0">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Client</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Adresse</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Contact</th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filtered.map((client: Client) => (
-              <tr key={client.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/clients/${client.id}`)}>
-                <td className="px-4 py-3">
-                  <div className="font-medium text-blue-600 hover:text-blue-800">{clientDisplayName(client)}</div>
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-600">
-                  {client.adresse && `${client.adresse}, `}{client.npa} {client.ville}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-600">
-                  {client.telephone && <div>{client.telephone}</div>}
-                  {client.email && <div>{client.email}</div>}
-                </td>
-                <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex justify-end gap-1">
-                    <button onClick={() => navigate(`/clients/${client.id}`)} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600" title="Voir détails">
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => setEditing(client)} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600" title="Modifier">
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => handleDelete(client.id)} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-600" title="Supprimer">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+      {/* Client cards grid */}
+      {filtered.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <span className="text-2xl">👤</span>
+          </div>
+          <p className="text-sm text-muted-foreground">Aucun client trouvé</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((client: Client) => (
+            <div
+              key={client.id}
+              className="card card-hover cursor-pointer group"
+              onClick={() => navigate(`/clients/${client.id}`)}
+            >
+              <div className="flex items-start gap-3">
+                {/* Avatar */}
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                  style={{ background: 'var(--gradient-primary)' }}
+                >
+                  {getInitials(client)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-semibold text-foreground truncate">{clientDisplayName(client)}</h3>
+                  {client.entreprise && client.nom && (
+                    <p className="text-xs text-muted-foreground truncate">{client.prenom} {client.nom}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Contact info */}
+              <div className="mt-3 space-y-1.5">
+                {client.telephone && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Phone className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{client.telephone}</span>
                   </div>
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">
-                  Aucun client trouvé
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                )}
+                {client.email && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Mail className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{client.email}</span>
+                  </div>
+                )}
+                {(client.ville || client.npa) && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <MapPin className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{client.npa} {client.ville}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Hover actions */}
+              <div className="mt-3 pt-3 border-t border-border flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => setEditing(client)} className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-primary transition-colors" title="Modifier">
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button onClick={() => handleDelete(client.id)} className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors" title="Supprimer">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Modal */}
       {(creating || editing) && (

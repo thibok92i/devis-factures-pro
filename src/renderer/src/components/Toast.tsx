@@ -33,18 +33,31 @@ const icons = {
   info: Info
 }
 
-const colors = {
-  success: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-  error: 'bg-red-50 border-red-200 text-red-800',
-  warning: 'bg-amber-50 border-amber-200 text-amber-800',
-  info: 'bg-blue-50 border-blue-200 text-blue-800'
-}
-
-const iconColors = {
-  success: 'text-emerald-500',
-  error: 'text-red-500',
-  warning: 'text-amber-500',
-  info: 'text-blue-500'
+const styles: Record<ToastType, { bg: string; border: string; text: string; icon: string }> = {
+  success: {
+    bg: 'hsl(145 60% 40% / 0.08)',
+    border: 'hsl(145 60% 40% / 0.25)',
+    text: 'hsl(145 60% 30%)',
+    icon: 'hsl(145 60% 40%)'
+  },
+  error: {
+    bg: 'hsl(var(--destructive) / 0.08)',
+    border: 'hsl(var(--destructive) / 0.25)',
+    text: 'hsl(0 70% 40%)',
+    icon: 'hsl(var(--destructive))'
+  },
+  warning: {
+    bg: 'hsl(35 80% 50% / 0.08)',
+    border: 'hsl(35 80% 50% / 0.25)',
+    text: 'hsl(35 80% 30%)',
+    icon: 'hsl(35 80% 50%)'
+  },
+  info: {
+    bg: 'hsl(var(--primary) / 0.08)',
+    border: 'hsl(var(--primary) / 0.25)',
+    text: 'hsl(var(--primary))',
+    icon: 'hsl(var(--primary))'
+  }
 }
 
 let nextId = 0
@@ -77,12 +90,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
         {toasts.map((t) => {
           const Icon = icons[t.type]
+          const s = styles[t.type]
           return (
             <div
               key={t.id}
-              className={`flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg animate-slide-in ${colors[t.type]}`}
+              className="flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg animate-slide-in"
+              style={{
+                background: s.bg,
+                borderColor: s.border,
+                color: s.text
+              }}
             >
-              <Icon className={`h-5 w-5 shrink-0 ${iconColors[t.type]}`} />
+              <Icon className="h-5 w-5 shrink-0" style={{ color: s.icon }} />
               <p className="text-sm font-medium flex-1">{t.message}</p>
               <button onClick={() => removeToast(t.id)} className="shrink-0 opacity-60 hover:opacity-100">
                 <X className="h-4 w-4" />

@@ -25,22 +25,22 @@ function ItemForm({
   })
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="card w-full max-w-lg">
+    <div className="modal-overlay">
+      <div className="modal w-full max-w-lg">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">{item ? 'Modifier' : 'Nouvel article'}</h3>
-          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+          <h3 className="text-lg font-semibold text-foreground">{item ? 'Modifier' : 'Nouvel article'}</h3>
+          <button onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-5 w-5" /></button>
         </div>
         <form onSubmit={(e) => { e.preventDefault(); onSave(form) }} className="space-y-3">
           <div>
             <label className="label">Type *</label>
             <div className="flex gap-2">
               <button type="button" onClick={() => setForm({ ...form, type: 'materiau' })}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${form.type === 'materiau' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${form.type === 'materiau' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted/50'}`}>
                 <Package className="inline h-4 w-4 mr-1" />Matériau
               </button>
               <button type="button" onClick={() => setForm({ ...form, type: 'main_oeuvre' })}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${form.type === 'main_oeuvre' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${form.type === 'main_oeuvre' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted/50'}`}>
                 <Wrench className="inline h-4 w-4 mr-1" />Main d'oeuvre
               </button>
             </div>
@@ -110,6 +110,14 @@ export default function Catalogue() {
     return matchesSearch && matchesType
   })
 
+  // Group by category
+  const grouped = filtered.reduce((acc: Record<string, CatalogueItem[]>, item: CatalogueItem) => {
+    const cat = item.categorie || 'Sans catégorie'
+    if (!acc[cat]) acc[cat] = []
+    acc[cat].push(item)
+    return acc
+  }, {})
+
   const handleSave = async (data: Partial<CatalogueItem>) => {
     if (editing) {
       await execute(() => window.api.catalogue.update(editing.id, data))
@@ -133,72 +141,98 @@ export default function Catalogue() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Catalogue</h1>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Catalogue</h1>
+          <p className="page-subtitle">{(items || []).length} article{(items || []).length > 1 ? 's' : ''}</p>
+        </div>
         <button onClick={() => setCreating(true)} className="btn-primary">
           <Plus className="h-4 w-4" />
           Nouvel article
         </button>
       </div>
 
-      <div className="mb-4 flex gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input className="input pl-10" placeholder="Rechercher..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      {/* Search + Type filter */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+        <div className="search-bar flex-1">
+          <Search className="search-icon" />
+          <input className="search-input" placeholder="Rechercher..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <select className="input w-48" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-          <option value="all">Tous les types</option>
-          <option value="materiau">Matériaux</option>
-          <option value="main_oeuvre">Main d'oeuvre</option>
-        </select>
+        <div className="flex gap-1 rounded-lg border border-border p-1" style={{ background: 'hsl(var(--muted))' }}>
+          <button
+            onClick={() => setTypeFilter('all')}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all ${typeFilter === 'all' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+          >
+            Tous
+          </button>
+          <button
+            onClick={() => setTypeFilter('materiau')}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all flex items-center gap-1 ${typeFilter === 'materiau' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+          >
+            <Package className="h-3 w-3" /> Matériaux
+          </button>
+          <button
+            onClick={() => setTypeFilter('main_oeuvre')}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all flex items-center gap-1 ${typeFilter === 'main_oeuvre' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+          >
+            <Wrench className="h-3 w-3" /> Main d'oeuvre
+          </button>
+        </div>
       </div>
 
-      <div className="card overflow-hidden p-0">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Type</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Réf.</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Désignation</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Catégorie</th>
-              <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">Unité</th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Prix</th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filtered.map((item: CatalogueItem) => (
-              <tr key={item.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">
-                  {item.type === 'materiau' ? (
-                    <span className="badge badge-blue"><Package className="inline h-3 w-3 mr-1" />Matériau</span>
-                  ) : (
-                    <span className="badge badge-yellow"><Wrench className="inline h-3 w-3 mr-1" />Main d'oeuvre</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-600">{item.reference}</td>
-                <td className="px-4 py-3 text-sm font-medium">{item.designation}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">{item.categorie || '-'}</td>
-                <td className="px-4 py-3 text-center text-sm">{item.unite}</td>
-                <td className="px-4 py-3 text-right font-medium text-sm">{formatCHF(item.prix_unitaire)}</td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex justify-end gap-1">
-                    <button onClick={() => setEditing(item)} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600">
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => handleDelete(item.id)} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-600">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">Aucun article</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {/* Grouped list */}
+      {Object.keys(grouped).length === 0 ? (
+        <div className="empty-state">
+          <Package className="empty-state-icon" />
+          <p className="text-sm text-muted-foreground">Aucun article trouvé</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([category, categoryItems]) => (
+            <div key={category}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="wood-accent w-4" />
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{category}</h3>
+                <span className="text-xs text-muted-foreground/60">({categoryItems.length})</span>
+              </div>
+              <div className="card overflow-hidden p-0">
+                <div className="divide-y divide-border">
+                  {categoryItems.map((item: CatalogueItem) => (
+                    <div key={item.id} className="flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors group">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${item.type === 'materiau' ? 'bg-primary/10' : 'bg-accent/10'}`}>
+                          {item.type === 'materiau'
+                            ? <Package className="h-4 w-4 text-primary" />
+                            : <Wrench className="h-4 w-4 text-accent" />
+                          }
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-foreground">{item.designation}</span>
+                            {item.reference && <span className="text-xs text-muted-foreground">({item.reference})</span>}
+                          </div>
+                          <span className="text-xs text-muted-foreground">{item.unite}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-medium text-sm text-foreground">{formatCHF(item.prix_unitaire)}</span>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => setEditing(item)} className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-primary transition-colors">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={() => handleDelete(item.id)} className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {(creating || editing) && (
         <ItemForm item={editing || undefined} onSave={handleSave} onCancel={() => { setCreating(false); setEditing(null) }} />

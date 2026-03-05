@@ -93,7 +93,6 @@ export default function DevisEditor() {
     setSaving(true)
     try {
       await window.api.devis.saveLignes(devis.id, lignes)
-      // Refresh devis data
       const updated = await window.api.devis.get(devis.id)
       setDevis(updated)
       toast.success('Devis sauvegardé')
@@ -147,7 +146,14 @@ export default function DevisEditor() {
   )
 
   if (!devis) {
-    return <div className="flex items-center justify-center h-64 text-gray-500">Chargement...</div>
+    return (
+      <div className="flex items-center justify-center h-64 text-muted-foreground">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm">Chargement...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -155,12 +161,12 @@ export default function DevisEditor() {
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/devis')} className="rounded-lg p-2 hover:bg-gray-100">
-            <ArrowLeft className="h-5 w-5" />
+          <button onClick={() => navigate('/devis')} className="rounded-lg p-2 hover:bg-muted transition-colors">
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Devis {devis.numero}</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="page-title mb-0">Devis {devis.numero}</h1>
+            <p className="text-sm text-muted-foreground">
               {devis.client_entreprise || `${devis.client_prenom || ''} ${devis.client_nom}`}
             </p>
           </div>
@@ -197,26 +203,26 @@ export default function DevisEditor() {
       <div className="card mb-6 overflow-hidden p-0">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
+            <tr className="border-b border-border" style={{ background: 'hsl(var(--muted) / 0.5)' }}>
               <th className="px-1 py-2 w-[4%]"></th>
-              <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500 w-[28%]">Désignation</th>
-              <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500 w-[18%]">Description</th>
-              <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 w-[8%]">Unité</th>
-              <th className="px-3 py-2 text-right text-xs font-medium uppercase text-gray-500 w-[10%]">Qté</th>
-              <th className="px-3 py-2 text-right text-xs font-medium uppercase text-gray-500 w-[12%]">Prix unit.</th>
-              <th className="px-3 py-2 text-right text-xs font-medium uppercase text-gray-500 w-[12%]">Total</th>
+              <th className="px-3 py-2 text-left text-xs font-medium uppercase text-muted-foreground w-[28%]">Désignation</th>
+              <th className="px-3 py-2 text-left text-xs font-medium uppercase text-muted-foreground w-[18%]">Description</th>
+              <th className="px-3 py-2 text-center text-xs font-medium uppercase text-muted-foreground w-[8%]">Unité</th>
+              <th className="px-3 py-2 text-right text-xs font-medium uppercase text-muted-foreground w-[10%]">Qté</th>
+              <th className="px-3 py-2 text-right text-xs font-medium uppercase text-muted-foreground w-[12%]">Prix unit.</th>
+              <th className="px-3 py-2 text-right text-xs font-medium uppercase text-muted-foreground w-[12%]">Total</th>
               <th className="px-3 py-2 w-[6%]"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-border">
             {lignes.map((ligne, index) => (
-              <tr key={index} className="hover:bg-gray-50">
+              <tr key={index} className="hover:bg-muted/30 transition-colors">
                 <td className="px-1 py-1.5 text-center">
                   <div className="flex flex-col">
-                    <button onClick={() => moveLine(index, 'up')} disabled={index === 0} className="rounded p-0.5 text-gray-300 hover:text-gray-600 disabled:opacity-30">
+                    <button onClick={() => moveLine(index, 'up')} disabled={index === 0} className="rounded p-0.5 text-muted-foreground/40 hover:text-foreground disabled:opacity-30 transition-colors">
                       <ChevronUp className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => moveLine(index, 'down')} disabled={index === lignes.length - 1} className="rounded p-0.5 text-gray-300 hover:text-gray-600 disabled:opacity-30">
+                    <button onClick={() => moveLine(index, 'down')} disabled={index === lignes.length - 1} className="rounded p-0.5 text-muted-foreground/40 hover:text-foreground disabled:opacity-30 transition-colors">
                       <ChevronDown className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -244,11 +250,11 @@ export default function DevisEditor() {
                 <td className="px-3 py-1.5">
                   <input className="input text-sm text-right" type="number" step="0.05" min="0" value={ligne.prix_unitaire} onChange={(e) => updateLine(index, 'prix_unitaire', parseFloat(e.target.value) || 0)} />
                 </td>
-                <td className="px-3 py-1.5 text-right font-medium text-sm">
+                <td className="px-3 py-1.5 text-right font-medium text-sm text-foreground">
                   {formatCHF(ligne.quantite * ligne.prix_unitaire)}
                 </td>
                 <td className="px-3 py-1.5 text-center">
-                  <button onClick={() => removeLine(index)} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600">
+                  <button onClick={() => removeLine(index)} className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </td>
@@ -257,7 +263,7 @@ export default function DevisEditor() {
           </tbody>
         </table>
 
-        <div className="border-t border-gray-200 p-3 flex gap-2">
+        <div className="border-t border-border p-3 flex gap-2">
           <button onClick={addLine} className="btn-secondary text-sm">
             <Plus className="h-4 w-4" />
             Ligne libre
@@ -272,7 +278,7 @@ export default function DevisEditor() {
       {/* Remise */}
       <div className="mb-6 flex justify-end">
         <div className="flex items-center gap-3">
-          <label className="text-sm text-gray-600">Remise (%)</label>
+          <label className="text-sm text-muted-foreground">Remise (%)</label>
           <input
             className="input w-24 text-sm text-right"
             type="number"
@@ -295,22 +301,22 @@ export default function DevisEditor() {
         <div className="card w-80">
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Sous-total</span>
-              <span className="font-medium">{formatCHF(sousTotal)}</span>
+              <span className="text-muted-foreground">Sous-total</span>
+              <span className="font-medium text-foreground">{formatCHF(sousTotal)}</span>
             </div>
             {remisePourcent > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Remise ({remisePourcent}%)</span>
-                <span className="font-medium text-red-600">-{formatCHF(remiseMontant)}</span>
+                <span className="text-muted-foreground">Remise ({remisePourcent}%)</span>
+                <span className="font-medium text-destructive">-{formatCHF(remiseMontant)}</span>
               </div>
             )}
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">TVA ({tauxTva}%)</span>
-              <span className="font-medium">{formatCHF(montantTva)}</span>
+              <span className="text-muted-foreground">TVA ({tauxTva}%)</span>
+              <span className="font-medium text-foreground">{formatCHF(montantTva)}</span>
             </div>
-            <div className="border-t border-gray-200 pt-2 flex justify-between">
-              <span className="font-semibold text-gray-900">Total TTC</span>
-              <span className="text-lg font-bold text-blue-600">{formatCHF(total)}</span>
+            <div className="border-t border-border pt-2 flex justify-between">
+              <span className="font-semibold text-foreground">Total TTC</span>
+              <span className="text-lg font-bold text-primary">{formatCHF(total)}</span>
             </div>
           </div>
         </div>
@@ -342,31 +348,31 @@ export default function DevisEditor() {
 
       {/* Catalogue picker modal */}
       {showCatalogue && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="card w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div className="modal-overlay">
+          <div className="modal w-full max-w-2xl max-h-[80vh] flex flex-col">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Catalogue</h3>
+              <h3 className="text-lg font-semibold text-foreground">Catalogue</h3>
               <button onClick={() => { setShowCatalogue(false); setCatalogueSearch('') }} className="btn-secondary text-sm">Fermer</button>
             </div>
-            <div className="mb-3 relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <input className="input pl-10" placeholder="Rechercher..." value={catalogueSearch} onChange={(e) => setCatalogueSearch(e.target.value)} autoFocus />
+            <div className="search-bar mb-3">
+              <Search className="search-icon" />
+              <input className="search-input" placeholder="Rechercher..." value={catalogueSearch} onChange={(e) => setCatalogueSearch(e.target.value)} autoFocus />
             </div>
             <div className="overflow-y-auto flex-1">
               {filteredCatalogue.map((item) => (
-                <button key={item.id} onClick={() => addFromCatalogue(item)} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-blue-50 transition-colors">
+                <button key={item.id} onClick={() => addFromCatalogue(item)} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-primary/5 transition-colors">
                   <div>
-                    <div className="text-sm font-medium text-gray-900">{item.designation}</div>
-                    <div className="text-xs text-gray-500">{item.reference} - {item.type === 'materiau' ? 'Matériau' : "Main d'oeuvre"} - {item.categorie || 'Sans catégorie'}</div>
+                    <div className="text-sm font-medium text-foreground">{item.designation}</div>
+                    <div className="text-xs text-muted-foreground">{item.reference} - {item.type === 'materiau' ? 'Matériau' : "Main d'oeuvre"} - {item.categorie || 'Sans catégorie'}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-medium">{formatCHF(item.prix_unitaire)}</div>
-                    <div className="text-xs text-gray-500">/{item.unite}</div>
+                    <div className="text-sm font-medium text-foreground">{formatCHF(item.prix_unitaire)}</div>
+                    <div className="text-xs text-muted-foreground">/{item.unite}</div>
                   </div>
                 </button>
               ))}
               {filteredCatalogue.length === 0 && (
-                <p className="py-8 text-center text-sm text-gray-500">Aucun article trouvé</p>
+                <p className="py-8 text-center text-sm text-muted-foreground">Aucun article trouvé</p>
               )}
             </div>
           </div>

@@ -56,8 +56,8 @@ export default function Settings() {
 
   return (
     <div className="max-w-3xl">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Réglages</h1>
+      <div className="page-header">
+        <h1 className="page-title">Réglages</h1>
         <button onClick={handleSave} disabled={saving} className="btn-primary">
           <Save className="h-4 w-4" />
           {saved ? 'Sauvegardé !' : saving ? 'Sauvegarde...' : 'Sauvegarder'}
@@ -67,8 +67,8 @@ export default function Settings() {
       {/* Company info */}
       <div className="card mb-6">
         <div className="mb-4 flex items-center gap-2">
-          <Building2 className="h-5 w-5 text-blue-600" />
-          <h2 className="text-lg font-semibold">Informations entreprise</h2>
+          <Building2 className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold text-foreground">Informations entreprise</h2>
         </div>
         <div className="space-y-3">
           <div>
@@ -115,8 +115,8 @@ export default function Settings() {
       {/* TVA & Conditions */}
       <div className="card mb-6">
         <div className="mb-4 flex items-center gap-2">
-          <ReceiptText className="h-5 w-5 text-indigo-600" />
-          <h2 className="text-lg font-semibold">TVA & Conditions</h2>
+          <ReceiptText className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold text-foreground">TVA & Conditions</h2>
         </div>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -139,10 +139,10 @@ export default function Settings() {
           </div>
 
           {/* Délais */}
-          <div className="border-t pt-3 mt-3">
+          <div className="border-t border-border pt-3 mt-3">
             <div className="mb-2 flex items-center gap-2">
-              <Clock className="h-4 w-4 text-gray-500" />
-              <span className="text-sm font-medium text-gray-700">Délais</span>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground">Délais</span>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -161,8 +161,8 @@ export default function Settings() {
       {/* IBAN / Informations bancaires */}
       <div className="card mb-6">
         <div className="mb-4 flex items-center gap-2">
-          <Landmark className="h-5 w-5 text-emerald-600" />
-          <h2 className="text-lg font-semibold">Informations bancaires</h2>
+          <Landmark className="h-5 w-5" style={{ color: 'hsl(145 60% 40%)' }} />
+          <h2 className="text-lg font-semibold text-foreground">Informations bancaires</h2>
         </div>
         <div className="space-y-3">
           <div>
@@ -179,13 +179,13 @@ export default function Settings() {
       {/* License */}
       <div className="card mb-6">
         <div className="mb-4 flex items-center gap-2">
-          <Key className="h-5 w-5 text-amber-600" />
-          <h2 className="text-lg font-semibold">Licence</h2>
+          <Key className="h-5 w-5" style={{ color: 'hsl(35 80% 50%)' }} />
+          <h2 className="text-lg font-semibold text-foreground">Licence</h2>
         </div>
         <div className="mb-3">
           <div className="flex items-center gap-2 mb-2">
-            <div className={`h-2 w-2 rounded-full ${licenseStatus.isActive ? 'bg-emerald-500' : 'bg-red-500'}`} />
-            <span className="text-sm font-medium">
+            <div className={`h-2 w-2 rounded-full ${licenseStatus.isActive ? 'bg-green-500' : 'bg-destructive'}`} />
+            <span className="text-sm font-medium text-foreground">
               {licenseStatus.isActive ? `Licence active (${licenseStatus.key})` : 'Licence non activée'}
             </span>
           </div>
@@ -202,16 +202,16 @@ export default function Settings() {
             <button onClick={handleActivateLicense} className="btn-primary">Activer</button>
           </div>
         )}
-        {licenseMessage && <p className="mt-2 text-sm text-emerald-600">{licenseMessage}</p>}
+        {licenseMessage && <p className="mt-2 text-sm" style={{ color: 'hsl(145 60% 40%)' }}>{licenseMessage}</p>}
       </div>
 
       {/* Backup */}
       <div className="card">
         <div className="mb-4 flex items-center gap-2">
-          <HardDrive className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold">Sauvegarde</h2>
+          <HardDrive className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-lg font-semibold text-foreground">Sauvegarde</h2>
         </div>
-        <p className="mb-3 text-sm text-gray-600">
+        <p className="mb-3 text-sm text-muted-foreground">
           Les sauvegardes automatiques sont effectuées toutes les 30 minutes dans le dossier Documents/DevisPro/Sauvegardes.
         </p>
         <button onClick={handleBackup} className="btn-secondary">

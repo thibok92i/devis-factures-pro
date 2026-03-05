@@ -39,19 +39,26 @@ export default function FactureView() {
   }
 
   if (!facture) {
-    return <div className="flex items-center justify-center h-64 text-gray-500">Chargement...</div>
+    return (
+      <div className="flex items-center justify-center h-64 text-muted-foreground">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm">Chargement...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/factures')} className="rounded-lg p-2 hover:bg-gray-100">
-            <ArrowLeft className="h-5 w-5" />
+          <button onClick={() => navigate('/factures')} className="rounded-lg p-2 hover:bg-muted transition-colors">
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Facture {facture.numero}</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="page-title mb-0">Facture {facture.numero}</h1>
+            <p className="text-sm text-muted-foreground">
               {facture.client_entreprise || `${facture.client_prenom || ''} ${facture.client_nom}`}
             </p>
           </div>
@@ -80,19 +87,19 @@ export default function FactureView() {
       {/* Invoice details */}
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div className="card">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">Client</h3>
-          <p className="font-medium">{facture.client_entreprise || ''}</p>
-          <p>{facture.client_prenom} {facture.client_nom}</p>
-          <p className="text-sm text-gray-600">{facture.client_adresse}</p>
-          <p className="text-sm text-gray-600">{facture.client_npa} {facture.client_ville}</p>
+          <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">Client</h3>
+          <p className="font-medium text-foreground">{facture.client_entreprise || ''}</p>
+          <p className="text-foreground">{facture.client_prenom} {facture.client_nom}</p>
+          <p className="text-sm text-muted-foreground">{facture.client_adresse}</p>
+          <p className="text-sm text-muted-foreground">{facture.client_npa} {facture.client_ville}</p>
         </div>
         <div className="card">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">Détails</h3>
+          <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">Détails</h3>
           <div className="space-y-1 text-sm">
-            <div className="flex justify-between"><span className="text-gray-600">Date:</span><span>{formatDate(facture.date)}</span></div>
-            <div className="flex justify-between"><span className="text-gray-600">Échéance:</span><span>{formatDate(facture.echeance)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Date:</span><span className="text-foreground">{formatDate(facture.date)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Échéance:</span><span className="text-foreground">{formatDate(facture.echeance)}</span></div>
             {facture.date_paiement && (
-              <div className="flex justify-between"><span className="text-gray-600">Payée le:</span><span>{formatDate(facture.date_paiement)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Payée le:</span><span className="text-foreground">{formatDate(facture.date_paiement)}</span></div>
             )}
           </div>
         </div>
@@ -102,25 +109,25 @@ export default function FactureView() {
       <div className="card overflow-hidden p-0 mb-6">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Désignation</th>
-              <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">Unité</th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Qté</th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Prix unit.</th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Total</th>
+            <tr className="border-b border-border" style={{ background: 'hsl(var(--muted) / 0.5)' }}>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Désignation</th>
+              <th className="px-4 py-3 text-center text-xs font-medium uppercase text-muted-foreground">Unité</th>
+              <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">Qté</th>
+              <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">Prix unit.</th>
+              <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">Total</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-border">
             {facture.lignes.map((l) => (
-              <tr key={l.id}>
+              <tr key={l.id} className="hover:bg-muted/30 transition-colors">
                 <td className="px-4 py-3">
-                  <div className="font-medium text-sm">{l.designation}</div>
-                  {l.description && <div className="text-xs text-gray-500">{l.description}</div>}
+                  <div className="font-medium text-sm text-foreground">{l.designation}</div>
+                  {l.description && <div className="text-xs text-muted-foreground">{l.description}</div>}
                 </td>
-                <td className="px-4 py-3 text-center text-sm">{l.unite}</td>
-                <td className="px-4 py-3 text-right text-sm">{l.quantite}</td>
-                <td className="px-4 py-3 text-right text-sm">{formatCHF(l.prix_unitaire)}</td>
-                <td className="px-4 py-3 text-right font-medium text-sm">{formatCHF(l.total)}</td>
+                <td className="px-4 py-3 text-center text-sm text-muted-foreground">{l.unite}</td>
+                <td className="px-4 py-3 text-right text-sm text-foreground">{l.quantite}</td>
+                <td className="px-4 py-3 text-right text-sm text-foreground">{formatCHF(l.prix_unitaire)}</td>
+                <td className="px-4 py-3 text-right font-medium text-sm text-foreground">{formatCHF(l.total)}</td>
               </tr>
             ))}
           </tbody>
@@ -132,22 +139,22 @@ export default function FactureView() {
         <div className="card w-80">
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Sous-total</span>
-              <span className="font-medium">{formatCHF(facture.sous_total)}</span>
+              <span className="text-muted-foreground">Sous-total</span>
+              <span className="font-medium text-foreground">{formatCHF(facture.sous_total)}</span>
             </div>
             {facture.remise_pourcent > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Remise ({facture.remise_pourcent}%)</span>
-                <span className="font-medium text-red-600">-{formatCHF(facture.remise_montant)}</span>
+                <span className="text-muted-foreground">Remise ({facture.remise_pourcent}%)</span>
+                <span className="font-medium text-destructive">-{formatCHF(facture.remise_montant)}</span>
               </div>
             )}
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">TVA ({facture.taux_tva}%)</span>
-              <span className="font-medium">{formatCHF(facture.montant_tva)}</span>
+              <span className="text-muted-foreground">TVA ({facture.taux_tva}%)</span>
+              <span className="font-medium text-foreground">{formatCHF(facture.montant_tva)}</span>
             </div>
-            <div className="border-t border-gray-200 pt-2 flex justify-between">
-              <span className="font-semibold">Total TTC</span>
-              <span className="text-lg font-bold text-emerald-600">{formatCHF(facture.total)}</span>
+            <div className="border-t border-border pt-2 flex justify-between">
+              <span className="font-semibold text-foreground">Total TTC</span>
+              <span className="text-lg font-bold text-primary">{formatCHF(facture.total)}</span>
             </div>
           </div>
         </div>

@@ -47,19 +47,25 @@ export default function ClientDetail() {
   }, [id])
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64 text-gray-500">Chargement...</div>
-  }
-
-  if (!client) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-        <p>Client introuvable</p>
-        <button onClick={() => navigate('/clients')} className="btn-primary mt-4">Retour aux clients</button>
+      <div className="flex items-center justify-center h-64 text-muted-foreground">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm">Chargement...</p>
+        </div>
       </div>
     )
   }
 
-  // Summary stats
+  if (!client) {
+    return (
+      <div className="empty-state">
+        <p className="text-sm text-muted-foreground mb-4">Client introuvable</p>
+        <button onClick={() => navigate('/clients')} className="btn-primary">Retour aux clients</button>
+      </div>
+    )
+  }
+
   const totalFacture = factures.reduce((sum, f) => sum + f.total, 0)
   const totalPaye = factures.filter((f) => f.statut === 'payee').reduce((sum, f) => sum + f.total, 0)
 
@@ -68,10 +74,21 @@ export default function ClientDetail() {
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/clients')} className="rounded-lg p-2 hover:bg-gray-100">
-            <ArrowLeft className="h-5 w-5" />
+          <button onClick={() => navigate('/clients')} className="rounded-lg p-2 hover:bg-muted transition-colors">
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </button>
-          <h1 className="text-2xl font-bold text-gray-900">{clientDisplayName(client)}</h1>
+          <div className="flex items-center gap-3">
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white"
+              style={{ background: 'var(--gradient-primary)' }}
+            >
+              {client.entreprise
+                ? client.entreprise.substring(0, 2).toUpperCase()
+                : ((client.prenom?.[0] || '') + (client.nom?.[0] || '')).toUpperCase()
+              }
+            </div>
+            <h1 className="page-title mb-0">{clientDisplayName(client)}</h1>
+          </div>
         </div>
         <div className="flex gap-2">
           <button
@@ -92,43 +109,43 @@ export default function ClientDetail() {
       <div className="grid grid-cols-1 gap-6 mb-8 lg:grid-cols-2">
         {/* Client info card */}
         <div className="card">
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-500">Informations client</h3>
+          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Informations client</h3>
           <div className="space-y-3">
             {client.entreprise && (
               <div>
-                <span className="text-xs font-medium uppercase text-gray-400">Entreprise</span>
-                <p className="font-medium text-gray-900">{client.entreprise}</p>
+                <span className="text-xs font-medium uppercase text-muted-foreground/70">Entreprise</span>
+                <p className="font-medium text-foreground">{client.entreprise}</p>
               </div>
             )}
             <div>
-              <span className="text-xs font-medium uppercase text-gray-400">Nom</span>
-              <p className="font-medium text-gray-900">{[client.prenom, client.nom].filter(Boolean).join(' ')}</p>
+              <span className="text-xs font-medium uppercase text-muted-foreground/70">Nom</span>
+              <p className="font-medium text-foreground">{[client.prenom, client.nom].filter(Boolean).join(' ')}</p>
             </div>
             {client.adresse && (
               <div className="flex items-start gap-2">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                 <div>
-                  <p className="text-sm text-gray-700">{client.adresse}</p>
-                  <p className="text-sm text-gray-700">{client.npa} {client.ville}</p>
+                  <p className="text-sm text-foreground">{client.adresse}</p>
+                  <p className="text-sm text-foreground">{client.npa} {client.ville}</p>
                 </div>
               </div>
             )}
             {client.telephone && (
               <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 shrink-0 text-gray-400" />
-                <p className="text-sm text-gray-700">{client.telephone}</p>
+                <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <p className="text-sm text-foreground">{client.telephone}</p>
               </div>
             )}
             {client.email && (
               <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 shrink-0 text-gray-400" />
-                <p className="text-sm text-gray-700">{client.email}</p>
+                <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <p className="text-sm text-foreground">{client.email}</p>
               </div>
             )}
             {client.notes && (
               <div>
-                <span className="text-xs font-medium uppercase text-gray-400">Notes</span>
-                <p className="text-sm text-gray-600 whitespace-pre-wrap">{client.notes}</p>
+                <span className="text-xs font-medium uppercase text-muted-foreground/70">Notes</span>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{client.notes}</p>
               </div>
             )}
           </div>
@@ -136,29 +153,29 @@ export default function ClientDetail() {
 
         {/* Summary stats card */}
         <div className="card">
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-500">Résumé</h3>
+          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Résumé</h3>
           <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-lg bg-blue-50 p-4">
+            <div className="rounded-lg p-4" style={{ background: 'hsl(var(--primary) / 0.08)' }}>
               <div className="flex items-center gap-2 mb-1">
-                <FileText className="h-4 w-4 text-blue-600" />
-                <span className="text-sm text-gray-600">Devis</span>
+                <FileText className="h-4 w-4 text-primary" />
+                <span className="text-sm text-muted-foreground">Devis</span>
               </div>
-              <p className="text-2xl font-bold text-gray-900">{devis.length}</p>
+              <p className="text-2xl font-bold text-foreground">{devis.length}</p>
             </div>
-            <div className="rounded-lg bg-emerald-50 p-4">
+            <div className="rounded-lg p-4" style={{ background: 'hsl(145 60% 40% / 0.08)' }}>
               <div className="flex items-center gap-2 mb-1">
-                <Receipt className="h-4 w-4 text-emerald-600" />
-                <span className="text-sm text-gray-600">Factures</span>
+                <Receipt className="h-4 w-4" style={{ color: 'hsl(145 60% 40%)' }} />
+                <span className="text-sm text-muted-foreground">Factures</span>
               </div>
-              <p className="text-2xl font-bold text-gray-900">{factures.length}</p>
+              <p className="text-2xl font-bold text-foreground">{factures.length}</p>
             </div>
-            <div className="rounded-lg bg-amber-50 p-4">
-              <span className="text-sm text-gray-600">Total facturé</span>
-              <p className="text-lg font-bold text-gray-900">{formatCHF(totalFacture)}</p>
+            <div className="rounded-lg p-4" style={{ background: 'hsl(35 80% 50% / 0.08)' }}>
+              <span className="text-sm text-muted-foreground">Total facturé</span>
+              <p className="text-lg font-bold text-foreground">{formatCHF(totalFacture)}</p>
             </div>
-            <div className="rounded-lg bg-green-50 p-4">
-              <span className="text-sm text-gray-600">Total payé</span>
-              <p className="text-lg font-bold text-emerald-600">{formatCHF(totalPaye)}</p>
+            <div className="rounded-lg p-4" style={{ background: 'hsl(145 60% 40% / 0.08)' }}>
+              <span className="text-sm text-muted-foreground">Total payé</span>
+              <p className="text-lg font-bold" style={{ color: 'hsl(145 60% 40%)' }}>{formatCHF(totalPaye)}</p>
             </div>
           </div>
         </div>
@@ -166,38 +183,37 @@ export default function ClientDetail() {
 
       {/* Devis section */}
       <div className="mb-8">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900 flex items-center gap-2">
-          <FileText className="h-5 w-5 text-blue-600" />
-          Devis
-        </h2>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="wood-accent w-4" />
+          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
+            Devis
+          </h2>
+        </div>
         <div className="card overflow-hidden p-0">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">N°</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Statut</th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Total</th>
+              <tr className="border-b border-border" style={{ background: 'hsl(var(--muted) / 0.5)' }}>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">N°</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Statut</th>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">Total</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-border">
               {devis.map((d) => (
-                <tr
-                  key={d.id}
-                  className="hover:bg-gray-50 cursor-pointer"
-                  onClick={() => navigate(`/devis/${d.id}`)}
-                >
-                  <td className="px-4 py-3 font-medium text-blue-600">{d.numero}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{formatDate(d.date)}</td>
+                <tr key={d.id} className="table-row cursor-pointer" onClick={() => navigate(`/devis/${d.id}`)}>
+                  <td className="px-4 py-3 font-medium text-primary">{d.numero}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(d.date)}</td>
                   <td className="px-4 py-3">
                     <span className={`badge ${devisStatutColor(d.statut)}`}>{devisStatutLabel(d.statut)}</span>
                   </td>
-                  <td className="px-4 py-3 text-right font-medium">{formatCHF(d.total)}</td>
+                  <td className="px-4 py-3 text-right font-medium text-foreground">{formatCHF(d.total)}</td>
                 </tr>
               ))}
               {devis.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">
+                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     Aucun devis pour ce client
                   </td>
                 </tr>
@@ -209,40 +225,39 @@ export default function ClientDetail() {
 
       {/* Factures section */}
       <div>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900 flex items-center gap-2">
-          <Receipt className="h-5 w-5 text-emerald-600" />
-          Factures
-        </h2>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="wood-accent w-4" />
+          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <Receipt className="h-5 w-5" style={{ color: 'hsl(145 60% 40%)' }} />
+            Factures
+          </h2>
+        </div>
         <div className="card overflow-hidden p-0">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">N°</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Échéance</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Statut</th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Total</th>
+              <tr className="border-b border-border" style={{ background: 'hsl(var(--muted) / 0.5)' }}>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">N°</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Échéance</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Statut</th>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">Total</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-border">
               {factures.map((f) => (
-                <tr
-                  key={f.id}
-                  className="hover:bg-gray-50 cursor-pointer"
-                  onClick={() => navigate(`/factures/${f.id}`)}
-                >
-                  <td className="px-4 py-3 font-medium text-emerald-600">{f.numero}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{formatDate(f.date)}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{formatDate(f.echeance)}</td>
+                <tr key={f.id} className="table-row cursor-pointer" onClick={() => navigate(`/factures/${f.id}`)}>
+                  <td className="px-4 py-3 font-medium text-primary">{f.numero}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(f.date)}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(f.echeance)}</td>
                   <td className="px-4 py-3">
                     <span className={`badge ${factureStatutColor(f.statut)}`}>{factureStatutLabel(f.statut)}</span>
                   </td>
-                  <td className="px-4 py-3 text-right font-medium">{formatCHF(f.total)}</td>
+                  <td className="px-4 py-3 text-right font-medium text-foreground">{formatCHF(f.total)}</td>
                 </tr>
               ))}
               {factures.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     Aucune facture pour ce client
                   </td>
                 </tr>

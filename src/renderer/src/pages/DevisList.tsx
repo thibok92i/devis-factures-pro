@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Search, FileText, ArrowRight, Trash2, Download, Copy } from 'lucide-react'
+import { Plus, Search, FileText, ArrowRight, Trash2, Download, Copy, X } from 'lucide-react'
 import { useApiData, useApiCall } from '../hooks/useApi'
 import { useToast } from '../components/Toast'
 import { formatCHF, formatDate, clientDisplayName, devisStatutLabel, devisStatutColor } from '../utils/format'
 import type { DevisWithClient, Client } from '../types'
+
+const statusFilters = [
+  { value: 'all', label: 'Tous' },
+  { value: 'brouillon', label: 'Brouillons' },
+  { value: 'envoye', label: 'Envoyés' },
+  { value: 'accepte', label: 'Acceptés' },
+  { value: 'refuse', label: 'Refusés' },
+]
 
 export default function DevisList() {
   const { data: devisList, refresh } = useApiData(() => window.api.devis.list())
@@ -14,6 +22,7 @@ export default function DevisList() {
   const [searchParams] = useSearchParams()
   const toast = useToast()
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [showNewModal, setShowNewModal] = useState(false)
   const [selectedClient, setSelectedClient] = useState('')
 
@@ -25,8 +34,10 @@ export default function DevisList() {
 
   const filtered = (devisList || []).filter((d: DevisWithClient) => {
     const clientName = clientDisplayName({ nom: d.client_nom, prenom: d.client_prenom, entreprise: d.client_entreprise })
-    return d.numero.toLowerCase().includes(search.toLowerCase()) ||
+    const matchesSearch = d.numero.toLowerCase().includes(search.toLowerCase()) ||
       clientName.toLowerCase().includes(search.toLowerCase())
+    const matchesStatus = statusFilter === 'all' || d.statut === statusFilter
+    return matchesSearch && matchesStatus
   })
 
   const handleCreate = async () => {
@@ -74,73 +85,107 @@ export default function DevisList() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Devis</h1>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Devis</h1>
+          <p className="page-subtitle">{(devisList || []).length} devis au total</p>
+        </div>
         <button onClick={() => setShowNewModal(true)} className="btn-primary">
           <Plus className="h-4 w-4" />
           Nouveau devis
         </button>
       </div>
 
-      <div className="mb-4 relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-        <input className="input pl-10" placeholder="Rechercher..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      {/* Search + Status filter */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+        <div className="search-bar flex-1">
+          <Search className="search-icon" />
+          <input className="search-input" placeholder="Rechercher..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <div className="flex gap-1 rounded-lg border border-border p-1" style={{ background: 'hsl(var(--muted))' }}>
+          {statusFilters.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setStatusFilter(f.value)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
+                statusFilter === f.value
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
+      {/* Table */}
       <div className="card overflow-hidden p-0">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">N°</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Client</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Date</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Statut</th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Total</th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filtered.map((d: DevisWithClient) => (
-              <tr key={d.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/devis/${d.id}`)}>
-                <td className="px-4 py-3 font-medium text-blue-600">{d.numero}</td>
-                <td className="px-4 py-3 text-sm">{clientDisplayName({ nom: d.client_nom, prenom: d.client_prenom, entreprise: d.client_entreprise })}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">{formatDate(d.date)}</td>
-                <td className="px-4 py-3">
-                  <span className={`badge ${devisStatutColor(d.statut)}`}>{devisStatutLabel(d.statut)}</span>
-                </td>
-                <td className="px-4 py-3 text-right font-medium">{formatCHF(d.total)}</td>
-                <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex justify-end gap-1">
-                    <button onClick={() => handleExportPdf(d.id)} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600" title="Exporter PDF">
-                      <Download className="h-4 w-4" />
-                    </button>
-                    {d.statut === 'accepte' && (
-                      <button onClick={() => handleConvertToFacture(d.id)} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-emerald-600" title="Convertir en facture">
-                        <ArrowRight className="h-4 w-4" />
-                      </button>
-                    )}
-                    <button onClick={() => handleDuplicate(d.id)} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600" title="Dupliquer">
-                      <Copy className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => handleDelete(d.id)} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-600" title="Supprimer">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border" style={{ background: 'hsl(var(--muted) / 0.5)' }}>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground tracking-wider">N°</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground tracking-wider">Client</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground tracking-wider">Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground tracking-wider">Statut</th>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground tracking-wider">Total</th>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground tracking-wider">Actions</th>
               </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">Aucun devis</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filtered.map((d: DevisWithClient) => (
+                <tr key={d.id} className="table-row cursor-pointer group" onClick={() => navigate(`/devis/${d.id}`)}>
+                  <td className="px-4 py-3 font-medium text-primary">{d.numero}</td>
+                  <td className="px-4 py-3 text-sm text-foreground">{clientDisplayName({ nom: d.client_nom, prenom: d.client_prenom, entreprise: d.client_entreprise })}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(d.date)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`badge ${devisStatutColor(d.statut)}`}>{devisStatutLabel(d.statut)}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium text-foreground">{formatCHF(d.total)}</td>
+                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => handleExportPdf(d.id)} className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-primary transition-colors" title="Exporter PDF">
+                        <Download className="h-4 w-4" />
+                      </button>
+                      {d.statut === 'accepte' && (
+                        <button onClick={() => handleConvertToFacture(d.id)} className="rounded p-1.5 text-muted-foreground hover:bg-accent/10 hover:text-accent transition-colors" title="Convertir en facture">
+                          <ArrowRight className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button onClick={() => handleDuplicate(d.id)} className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-primary transition-colors" title="Dupliquer">
+                        <Copy className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => handleDelete(d.id)} className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors" title="Supprimer">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center">
+                    <FileText className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">Aucun devis trouvé</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* New Devis Modal */}
       {showNewModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="card w-full max-w-md">
-            <h3 className="mb-4 text-lg font-semibold">Nouveau devis</h3>
+        <div className="modal-overlay">
+          <div className="modal w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-foreground">Nouveau devis</h3>
+              <button onClick={() => setShowNewModal(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
             <div className="mb-4">
               <label className="label">Client *</label>
               <select className="input" value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)}>

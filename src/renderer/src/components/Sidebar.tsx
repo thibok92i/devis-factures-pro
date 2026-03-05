@@ -6,7 +6,8 @@ import {
   Receipt,
   Package,
   Settings,
-  Search
+  ChevronRight,
+  Hammer
 } from 'lucide-react'
 
 const navItems = [
@@ -15,54 +16,106 @@ const navItems = [
   { to: '/devis', label: 'Devis', icon: FileText },
   { to: '/factures', label: 'Factures', icon: Receipt },
   { to: '/catalogue', label: 'Catalogue', icon: Package },
-  { to: '/settings', label: 'Réglages', icon: Settings }
 ]
 
 export default function Sidebar() {
   return (
-    <aside className="flex w-56 flex-col border-r border-gray-200 bg-white">
+    <aside
+      className="flex w-60 flex-col shrink-0"
+      style={{
+        background: 'var(--gradient-sidebar)',
+        borderRight: '1px solid hsl(var(--sidebar-border))'
+      }}
+    >
       {/* Logo */}
-      <div className="flex h-16 items-center gap-2 border-b border-gray-200 px-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-sm">
-          DP
+      <div
+        className="flex h-16 items-center gap-3 px-5"
+        style={{ borderBottom: '1px solid hsl(var(--sidebar-border))' }}
+      >
+        <div
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-white shrink-0"
+          style={{ background: 'var(--gradient-primary)', boxShadow: 'var(--shadow-primary)' }}
+        >
+          <Hammer className="h-4 w-4" />
         </div>
-        <span className="text-lg font-bold text-gray-900">DevisPro</span>
+        <div>
+          <p
+            className="text-sm font-bold leading-none"
+            style={{ color: 'hsl(35 30% 90%)', fontFamily: "'Playfair Display', serif", letterSpacing: '0.01em' }}
+          >
+            DevisPro
+          </p>
+          <p className="text-[10px] mt-0.5" style={{ color: 'hsl(var(--sidebar-muted))' }}>
+            Menuiserie · Suisse romande
+          </p>
+        </div>
       </div>
 
-      {/* Search shortcut */}
-      <button
-        onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
-        className="mx-3 mb-4 mt-3 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-      >
-        <Search className="h-4 w-4" />
-        <span className="flex-1 text-left">Rechercher...</span>
-        <kbd className="rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-mono">⌘K</kbd>
-      </button>
-
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-3">
+      {/* Nav */}
+      <nav className="flex-1 px-3 pt-4 pb-2 space-y-0.5">
+        <p
+          className="px-3 pb-2 text-[9px] font-bold uppercase tracking-[0.15em]"
+          style={{ color: 'hsl(var(--sidebar-muted))' }}
+        >
+          Navigation
+        </p>
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`
+              `nav-link ${isActive ? 'nav-link-active' : ''}`
             }
           >
-            <item.icon className="h-5 w-5" />
-            {item.label}
+            {({ isActive }) => (
+              <>
+                <item.icon
+                  className="h-4 w-4 shrink-0"
+                  style={{ color: isActive ? 'hsl(152 55% 62%)' : 'hsl(var(--sidebar-foreground))' }}
+                />
+                <span className="flex-1 text-sm">{item.label}</span>
+                {isActive && (
+                  <ChevronRight className="h-3.5 w-3.5" style={{ color: 'hsl(152 55% 62%)' }} />
+                )}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-gray-200 p-4">
-        <p className="text-xs text-gray-400">DevisPro v1.0.0</p>
-        <p className="text-xs text-gray-400">Menuiserie Suisse</p>
+      {/* Separator */}
+      <div className="mx-3" style={{ height: '1px', background: 'hsl(var(--sidebar-border))' }} />
+
+      {/* Bottom */}
+      <div className="p-3 pt-3 space-y-1">
+        <NavLink
+          to="/settings"
+          className={({ isActive }) => `nav-link ${isActive ? 'nav-link-active' : ''}`}
+        >
+          {({ isActive }) => (
+            <>
+              <Settings
+                className="h-4 w-4"
+                style={{ color: isActive ? 'hsl(152 55% 62%)' : 'hsl(var(--sidebar-foreground))' }}
+              />
+              <span className="text-sm">Réglages</span>
+            </>
+          )}
+        </NavLink>
+
+        {/* Region badge */}
+        <div
+          className="mt-2 rounded-lg p-3"
+          style={{ background: 'hsl(var(--sidebar-accent))' }}
+        >
+          <div className="wood-accent mb-2 w-8" />
+          <p className="text-xs font-semibold" style={{ color: 'hsl(35 30% 85%)' }}>
+            Région d'Oron
+          </p>
+          <p className="text-[10px] mt-0.5" style={{ color: 'hsl(var(--sidebar-muted))' }}>
+            Suisse romande · CHF · TVA 8.1%
+          </p>
+        </div>
       </div>
     </aside>
   )

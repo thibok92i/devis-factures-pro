@@ -1,10 +1,18 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Trash2, Download, CheckCircle } from 'lucide-react'
+import { Search, Trash2, Download, CheckCircle, Receipt } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { useApiData, useApiCall } from '../hooks/useApi'
 import { formatCHF, formatDate, clientDisplayName, factureStatutLabel, factureStatutColor } from '../utils/format'
 import type { FactureWithClient } from '../types'
+
+const statusFilters = [
+  { value: 'all', label: 'Toutes' },
+  { value: 'brouillon', label: 'Brouillons' },
+  { value: 'envoyee', label: 'Envoyées' },
+  { value: 'payee', label: 'Payées' },
+  { value: 'en_retard', label: 'En retard' },
+]
 
 export default function FacturesList() {
   const { data: factures, refresh } = useApiData(() => window.api.factures.list())
@@ -12,12 +20,20 @@ export default function FacturesList() {
   const navigate = useNavigate()
   const toast = useToast()
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
 
-  const filtered = (factures || []).filter((f: FactureWithClient) => {
+  const allFactures = factures || []
+
+  const filtered = allFactures.filter((f: FactureWithClient) => {
     const clientName = clientDisplayName({ nom: f.client_nom, prenom: f.client_prenom, entreprise: f.client_entreprise })
-    return f.numero.toLowerCase().includes(search.toLowerCase()) ||
+    const matchesSearch = f.numero.toLowerCase().includes(search.toLowerCase()) ||
       clientName.toLowerCase().includes(search.toLowerCase())
+    const matchesStatus = statusFilter === 'all' || f.statut === statusFilter
+    return matchesSearch && matchesStatus
   })
+
+  const totalEncaisse = allFactures.filter((f: FactureWithClient) => f.statut === 'payee').reduce((sum: number, f: FactureWithClient) => sum + f.total, 0)
+  const totalEnAttente = allFactures.filter((f: FactureWithClient) => f.statut !== 'payee').reduce((sum: number, f: FactureWithClient) => sum + f.total, 0)
 
   const handleDelete = async (id: string) => {
     if (confirm('Supprimer cette facture ?')) {
@@ -40,62 +56,116 @@ export default function FacturesList() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Factures</h1>
-        <p className="text-sm text-gray-500">Les factures sont créées automatiquement depuis les devis acceptés</p>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Factures</h1>
+          <p className="page-subtitle">Les factures sont créées depuis les devis acceptés</p>
+        </div>
       </div>
 
-      <div className="mb-4 relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-        <input className="input pl-10" placeholder="Rechercher..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      {/* Summary cards */}
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="stat-card">
+          <div className="flex items-center gap-3">
+            <div className="stat-icon" style={{ background: 'hsl(145 60% 40% / 0.12)' }}>
+              <CheckCircle className="h-5 w-5" style={{ color: 'hsl(145 60% 40%)' }} />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Encaissé</p>
+              <p className="text-2xl font-bold text-foreground">{formatCHF(totalEncaisse)}</p>
+            </div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="flex items-center gap-3">
+            <div className="stat-icon" style={{ background: 'hsl(35 80% 50% / 0.12)' }}>
+              <Receipt className="h-5 w-5" style={{ color: 'hsl(35 80% 50%)' }} />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">En attente</p>
+              <p className="text-2xl font-bold text-foreground">{formatCHF(totalEnAttente)}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
+      {/* Search + Status filter */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+        <div className="search-bar flex-1">
+          <Search className="search-icon" />
+          <input className="search-input" placeholder="Rechercher..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <div className="flex gap-1 rounded-lg border border-border p-1" style={{ background: 'hsl(var(--muted))' }}>
+          {statusFilters.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setStatusFilter(f.value)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
+                statusFilter === f.value
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Table */}
       <div className="card overflow-hidden p-0">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">N°</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Client</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Date</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Échéance</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Statut</th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Total</th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filtered.map((f: FactureWithClient) => (
-              <tr key={f.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/factures/${f.id}`)}>
-                <td className="px-4 py-3 font-medium text-emerald-600">{f.numero}</td>
-                <td className="px-4 py-3 text-sm">{clientDisplayName({ nom: f.client_nom, prenom: f.client_prenom, entreprise: f.client_entreprise })}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">{formatDate(f.date)}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">{formatDate(f.echeance)}</td>
-                <td className="px-4 py-3">
-                  <span className={`badge ${factureStatutColor(f.statut)}`}>{factureStatutLabel(f.statut)}</span>
-                </td>
-                <td className="px-4 py-3 text-right font-medium">{formatCHF(f.total)}</td>
-                <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex justify-end gap-1">
-                    <button onClick={() => handleExportPdf(f.id)} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600" title="PDF">
-                      <Download className="h-4 w-4" />
-                    </button>
-                    {f.statut !== 'payee' && (
-                      <button onClick={() => handleMarkPaid(f.id)} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-emerald-600" title="Marquer payée">
-                        <CheckCircle className="h-4 w-4" />
-                      </button>
-                    )}
-                    <button onClick={() => handleDelete(f.id)} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-600" title="Supprimer">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border" style={{ background: 'hsl(var(--muted) / 0.5)' }}>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground tracking-wider">N°</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground tracking-wider">Client</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground tracking-wider">Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground tracking-wider">Échéance</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground tracking-wider">Statut</th>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground tracking-wider">Total</th>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground tracking-wider">Actions</th>
               </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">Aucune facture</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filtered.map((f: FactureWithClient) => (
+                <tr key={f.id} className="table-row cursor-pointer group" onClick={() => navigate(`/factures/${f.id}`)}>
+                  <td className="px-4 py-3 font-medium text-primary">{f.numero}</td>
+                  <td className="px-4 py-3 text-sm text-foreground">{clientDisplayName({ nom: f.client_nom, prenom: f.client_prenom, entreprise: f.client_entreprise })}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(f.date)}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(f.echeance)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`badge ${factureStatutColor(f.statut)}`}>{factureStatutLabel(f.statut)}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium text-foreground">{formatCHF(f.total)}</td>
+                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => handleExportPdf(f.id)} className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-primary transition-colors" title="PDF">
+                        <Download className="h-4 w-4" />
+                      </button>
+                      {f.statut !== 'payee' && (
+                        <button onClick={() => handleMarkPaid(f.id)} className="rounded p-1.5 text-muted-foreground hover:bg-accent/10 hover:text-accent transition-colors" title="Marquer payée">
+                          <CheckCircle className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button onClick={() => handleDelete(f.id)} className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors" title="Supprimer">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center">
+                    <Receipt className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">Aucune facture trouvée</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )

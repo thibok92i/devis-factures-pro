@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Search, LayoutDashboard, Users, FileText, Receipt,
-  Package, Settings, Plus, X
+  Package, Settings, Plus
 } from 'lucide-react'
 
 interface Command {
@@ -88,25 +88,31 @@ export default function CommandPalette() {
 
   return (
     <div className="fixed inset-0 z-[90] flex items-start justify-center pt-[15vh]">
-      <div className="fixed inset-0 bg-black/50" onClick={() => setOpen(false)} />
-      <div className="relative w-full max-w-lg rounded-xl bg-white shadow-2xl border border-gray-200 overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-gray-200 px-4">
-          <Search className="h-5 w-5 text-gray-400 shrink-0" />
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setOpen(false)} />
+      <div
+        className="relative w-full max-w-lg rounded-xl shadow-2xl border overflow-hidden"
+        style={{
+          background: 'hsl(var(--card))',
+          borderColor: 'hsl(var(--border))'
+        }}
+      >
+        <div className="flex items-center gap-3 border-b px-4" style={{ borderColor: 'hsl(var(--border))' }}>
+          <Search className="h-5 w-5 text-muted-foreground shrink-0" />
           <input
             ref={inputRef}
-            className="flex-1 py-3.5 text-sm outline-none placeholder:text-gray-400 bg-transparent"
+            className="flex-1 py-3.5 text-sm outline-none placeholder:text-muted-foreground bg-transparent text-foreground"
             placeholder="Rechercher une page, action..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
           />
-          <kbd className="hidden sm:inline-flex items-center gap-1 rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] font-mono text-gray-500">
+          <kbd className="hidden sm:inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground" style={{ borderColor: 'hsl(var(--border))', background: 'hsl(var(--muted))' }}>
             ESC
           </kbd>
         </div>
         <div className="max-h-72 overflow-y-auto py-2">
           {filtered.length === 0 && (
-            <p className="px-4 py-6 text-center text-sm text-gray-500">Aucun résultat</p>
+            <p className="px-4 py-6 text-center text-sm text-muted-foreground">Aucun résultat</p>
           )}
           {filtered.map((cmd, i) => {
             const Icon = cmd.icon
@@ -114,23 +120,24 @@ export default function CommandPalette() {
               <button
                 key={cmd.id}
                 className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
-                  i === selectedIndex ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                  i === selectedIndex ? 'text-primary' : 'text-foreground hover:bg-muted/50'
                 }`}
+                style={i === selectedIndex ? { background: 'hsl(var(--primary) / 0.08)' } : {}}
                 onClick={() => cmd.action()}
                 onMouseEnter={() => setSelectedIndex(i)}
               >
-                <Icon className={`h-4 w-4 shrink-0 ${i === selectedIndex ? 'text-blue-500' : 'text-gray-400'}`} />
+                <Icon className={`h-4 w-4 shrink-0 ${i === selectedIndex ? 'text-primary' : 'text-muted-foreground'}`} />
                 <div className="flex-1 min-w-0">
                   <span className="font-medium">{cmd.label}</span>
                   {cmd.description && (
-                    <span className="ml-2 text-xs text-gray-400">{cmd.description}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">{cmd.description}</span>
                   )}
                 </div>
               </button>
             )
           })}
         </div>
-        <div className="flex items-center gap-4 border-t border-gray-100 bg-gray-50 px-4 py-2 text-[11px] text-gray-400">
+        <div className="flex items-center gap-4 border-t px-4 py-2 text-[11px] text-muted-foreground" style={{ borderColor: 'hsl(var(--border))', background: 'hsl(var(--muted) / 0.5)' }}>
           <span>↑↓ naviguer</span>
           <span>↵ ouvrir</span>
           <span>esc fermer</span>

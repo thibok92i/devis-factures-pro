@@ -5,12 +5,13 @@
 export function formatCHF(amount: number): string {
   return new Intl.NumberFormat('fr-CH', {
     style: 'currency',
-    currency: 'CHF'
+    currency: 'CHF',
+    minimumFractionDigits: 2
   }).format(amount)
 }
 
 export function formatDate(dateStr: string | undefined | null): string {
-  if (!dateStr) return ''
+  if (!dateStr) return '—'
   const d = new Date(dateStr)
   return d.toLocaleDateString('fr-CH', {
     day: '2-digit',
@@ -36,11 +37,8 @@ export function clientDisplayName(client: {
   prenom?: string | null
   entreprise?: string | null
 }): string {
-  const name = [client.prenom, client.nom].filter(Boolean).join(' ')
-  if (client.entreprise) {
-    return `${client.entreprise} (${name})`
-  }
-  return name
+  if (client.entreprise) return client.entreprise
+  return [client.prenom, client.nom].filter(Boolean).join(' ')
 }
 
 export function devisStatutLabel(statut: string): string {
@@ -64,21 +62,21 @@ export function factureStatutLabel(statut: string): string {
 }
 
 export function devisStatutColor(statut: string): string {
-  const colors: Record<string, string> = {
-    brouillon: 'badge-gray',
-    envoye: 'badge-blue',
-    accepte: 'badge-green',
-    refuse: 'badge-red'
+  const classes: Record<string, string> = {
+    brouillon: 'badge-draft',
+    envoye: 'badge-sent',
+    accepte: 'badge-accepted',
+    refuse: 'badge-refused'
   }
-  return colors[statut] || 'badge-gray'
+  return classes[statut] || 'badge-draft'
 }
 
 export function factureStatutColor(statut: string): string {
-  const colors: Record<string, string> = {
-    brouillon: 'badge-gray',
-    envoyee: 'badge-blue',
-    payee: 'badge-green',
-    en_retard: 'badge-red'
+  const classes: Record<string, string> = {
+    brouillon: 'badge-draft',
+    envoyee: 'badge-sent-invoice',
+    payee: 'badge-paid',
+    en_retard: 'badge-late'
   }
-  return colors[statut] || 'badge-gray'
+  return classes[statut] || 'badge-draft'
 }
