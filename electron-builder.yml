@@ -1,6 +1,6 @@
 appId: com.devispro.app
 productName: DevisPro
-copyright: Copyright © 2024 DevisPro
+copyright: Copyright © 2025 DevisPro
 
 directories:
   buildResources: build
@@ -24,12 +24,13 @@ win:
   sign: null
 
 nsis:
-  oneClick: false
+  oneClick: true
   perMachine: false
-  allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: DevisPro
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
 
 publish:
   provider: github

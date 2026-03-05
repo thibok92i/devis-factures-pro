@@ -43,7 +43,7 @@
   "build": {
     "appId": "com.devispro.app",
     "productName": "DevisPro",
-    "copyright": "Copyright © 2024 DevisPro",
+    "copyright": "Copyright © 2025 DevisPro",
     "asar": true,
     "asarUnpack": [
       "node_modules/sql.js/dist/sql-wasm.wasm"
@@ -72,13 +72,13 @@
       "sign": null
     },
     "nsis": {
-      "oneClick": false,
+      "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "DevisPro",
-      "license": "LICENSE.txt"
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
     },
     "publish": {
       "provider": "github",
