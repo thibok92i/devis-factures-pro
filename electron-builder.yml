@@ -1,0 +1,38 @@
+appId: com.devispro.app
+productName: DevisPro
+copyright: Copyright © 2024 DevisPro
+
+directories:
+  buildResources: build
+  output: release
+
+files:
+  - out/**/*
+  - node_modules/**/*
+
+asar: true
+asarUnpack:
+  - node_modules/sql.js/dist/sql-wasm.wasm
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+  artifactName: DevisPro-${version}-setup.${ext}
+  sign: null
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: DevisPro
+
+publish:
+  provider: github
+  owner: thibok92i
+  repo: devis-factures-pro
+  releaseType: release

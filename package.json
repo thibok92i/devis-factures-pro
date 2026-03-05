@@ -1,0 +1,90 @@
+{
+  "name": "devis-factures-pro",
+  "version": "1.0.0",
+  "description": "Logiciel de gestion de devis et factures pour menuisier indépendant",
+  "main": "./out/main/index.js",
+  "author": "DevisPro",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "dev:renderer": "vite src/renderer --config vite.renderer.config.ts",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "postbuild": "node scripts/obfuscate.mjs",
+    "package": "electron-vite build && node scripts/obfuscate.mjs && electron-builder --win",
+    "package:publish": "electron-vite build && node scripts/obfuscate.mjs && electron-builder --win --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3",
+    "sql.js": "^1.11.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@electron-toolkit/preload": "^3.0.1",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/uuid": "^10.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^5.0.0",
+    "javascript-obfuscator": "^4.2.2",
+    "lucide-react": "^0.468.0",
+    "postcss": "^8.4.49",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.0",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.0"
+  },
+  "build": {
+    "appId": "com.devispro.app",
+    "productName": "DevisPro",
+    "copyright": "Copyright © 2024 DevisPro",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/sql.js/dist/sql-wasm.wasm"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "DevisPro-${version}-setup.${ext}",
+      "signingHashAlgorithms": [
+        "sha256"
+      ],
+      "sign": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DevisPro",
+      "license": "LICENSE.txt"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "thibok92i",
+      "repo": "devis-factures-pro",
+      "releaseType": "release"
+    }
+  }
+}
