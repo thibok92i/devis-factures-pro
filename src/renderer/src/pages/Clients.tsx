@@ -1,98 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Pencil, Trash2, X, Phone, Mail, MapPin } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, Phone, Mail, MapPin } from 'lucide-react'
 import { useApiData, useApiCall } from '../hooks/useApi'
 import { useToast } from '../components/Toast'
+import ClientForm from '../components/ClientForm'
 import { clientDisplayName } from '../utils/format'
 import type { Client } from '../types'
-
-function ClientForm({
-  client,
-  onSave,
-  onCancel
-}: {
-  client?: Client
-  onSave: (data: Partial<Client>) => void
-  onCancel: () => void
-}) {
-  const [form, setForm] = useState({
-    nom: client?.nom || '',
-    prenom: client?.prenom || '',
-    entreprise: client?.entreprise || '',
-    adresse: client?.adresse || '',
-    npa: client?.npa || '',
-    ville: client?.ville || '',
-    telephone: client?.telephone || '',
-    email: client?.email || '',
-    notes: client?.notes || ''
-  })
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSave(form)
-  }
-
-  return (
-    <div className="modal-overlay">
-      <div className="modal w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-foreground">{client ? 'Modifier le client' : 'Nouveau client'}</h3>
-          <button onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Nom *</label>
-              <input className="input" required value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">Prénom</label>
-              <input className="input" value={form.prenom} onChange={(e) => setForm({ ...form, prenom: e.target.value })} />
-            </div>
-          </div>
-          <div>
-            <label className="label">Entreprise</label>
-            <input className="input" value={form.entreprise} onChange={(e) => setForm({ ...form, entreprise: e.target.value })} />
-          </div>
-          <div>
-            <label className="label">Adresse</label>
-            <input className="input" value={form.adresse} onChange={(e) => setForm({ ...form, adresse: e.target.value })} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">NPA</label>
-              <input className="input" value={form.npa} onChange={(e) => setForm({ ...form, npa: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">Ville</label>
-              <input className="input" value={form.ville} onChange={(e) => setForm({ ...form, ville: e.target.value })} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Téléphone</label>
-              <input className="input" value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">Email</label>
-              <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            </div>
-          </div>
-          <div>
-            <label className="label">Notes</label>
-            <textarea className="input" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onCancel} className="btn-secondary">Annuler</button>
-            <button type="submit" className="btn-primary">Enregistrer</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
 
 export default function Clients() {
   const { data: clients, refresh } = useApiData(() => window.api.clients.list())

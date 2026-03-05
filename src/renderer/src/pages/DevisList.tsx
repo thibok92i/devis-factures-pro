@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Search, FileText, ArrowRight, Trash2, Download, Copy, X } from 'lucide-react'
+import { Plus, Search, FileText, ArrowRight, Trash2, Download, Copy, X, FileStack } from 'lucide-react'
 import { useApiData, useApiCall } from '../hooks/useApi'
 import { useToast } from '../components/Toast'
 import { formatCHF, formatDate, clientDisplayName, devisStatutLabel, devisStatutColor } from '../utils/format'
-import type { DevisWithClient, Client } from '../types'
+import ClientSearchInput from '../components/ClientSearchInput'
+import ClientForm from '../components/ClientForm'
+import type { DevisWithClient, Client, DevisTemplate } from '../types'
 
 const statusFilters = [
   { value: 'all', label: 'Tous' },
@@ -16,7 +18,7 @@ const statusFilters = [
 
 export default function DevisList() {
   const { data: devisList, refresh } = useApiData(() => window.api.devis.list())
-  const { data: clients } = useApiData(() => window.api.clients.list())
+  const { data: clients, refresh: refreshClients } = useApiData(() => window.api.clients.list())
   const { execute } = useApiCall()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -25,12 +27,29 @@ export default function DevisList() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [showNewModal, setShowNewModal] = useState(false)
   const [selectedClient, setSelectedClient] = useState('')
+  const [showInlineClientForm, setShowInlineClientForm] = useState(false)
+  const [templates, setTemplates] = useState<DevisTemplate[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
 
   useEffect(() => {
     if (searchParams.get('action') === 'new') {
-      setShowNewModal(true)
+      openNewModal()
     }
   }, [searchParams])
+
+  const openNewModal = async () => {
+    setShowNewModal(true)
+    setSelectedClient('')
+    setSelectedTemplate(null)
+    setShowInlineClientForm(false)
+    // Load templates
+    try {
+      const tpls = await window.api.templates.list()
+      setTemplates(tpls)
+    } catch {
+      setTemplates([])
+    }
+  }
 
   const filtered = (devisList || []).filter((d: DevisWithClient) => {
     const clientName = clientDisplayName({ nom: d.client_nom, prenom: d.client_prenom, entreprise: d.client_entreprise })
@@ -44,9 +63,41 @@ export default function DevisList() {
     if (!selectedClient) return
     const result = await execute(() => window.api.devis.create({ client_id: selectedClient }))
     if (result) {
+      // If a template is selected, load its lines
+      if (selectedTemplate) {
+        try {
+          const tpl = await window.api.templates.get(selectedTemplate)
+          if (tpl && tpl.lignes.length > 0) {
+            await window.api.devis.saveLignes(result.id, tpl.lignes.map((l: Record<string, unknown>) => ({
+              catalogue_item_id: l.catalogue_item_id || null,
+              designation: l.designation,
+              description: l.description || '',
+              unite: l.unite,
+              quantite: l.quantite,
+              prix_unitaire: l.prix_unitaire
+            })))
+          }
+        } catch {
+          // Template lines failed to load, devis still created
+        }
+      }
       setShowNewModal(false)
       navigate(`/devis/${result.id}`)
       toast.success('Devis créé')
+    }
+  }
+
+  const handleInlineClientCreate = async (data: Partial<Record<string, unknown>>) => {
+    try {
+      const result = await window.api.clients.create(data)
+      if (result && result.id) {
+        await refreshClients()
+        setSelectedClient(result.id)
+        setShowInlineClientForm(false)
+        toast.success('Client créé')
+      }
+    } catch {
+      toast.error('Erreur lors de la création du client')
     }
   }
 
@@ -90,7 +141,7 @@ export default function DevisList() {
           <h1 className="page-title">Devis</h1>
           <p className="page-subtitle">{(devisList || []).length} devis au total</p>
         </div>
-        <button onClick={() => setShowNewModal(true)} className="btn-primary">
+        <button onClick={openNewModal} className="btn-primary">
           <Plus className="h-4 w-4" />
           Nouveau devis
         </button>
@@ -176,25 +227,67 @@ export default function DevisList() {
         </div>
       </div>
 
-      {/* New Devis Modal */}
+      {/* New Devis Modal — enhanced with search + templates */}
       {showNewModal && (
         <div className="modal-overlay">
-          <div className="modal w-full max-w-md">
+          <div className="modal w-full max-w-lg">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-foreground">Nouveau devis</h3>
               <button onClick={() => setShowNewModal(false)} className="text-muted-foreground hover:text-foreground transition-colors">
                 <X className="h-5 w-5" />
               </button>
             </div>
+
+            {/* Client search */}
             <div className="mb-4">
               <label className="label">Client *</label>
-              <select className="input" value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)}>
-                <option value="">Sélectionner un client...</option>
-                {(clients || []).map((c: Client) => (
-                  <option key={c.id} value={c.id}>{clientDisplayName(c)}</option>
-                ))}
-              </select>
+              <ClientSearchInput
+                clients={clients || []}
+                value={selectedClient || null}
+                onChange={(id) => setSelectedClient(id)}
+                onCreateNew={() => setShowInlineClientForm(true)}
+              />
+              {/* Inline client creation */}
+              {showInlineClientForm && (
+                <ClientForm
+                  inline
+                  onSave={handleInlineClientCreate}
+                  onCancel={() => setShowInlineClientForm(false)}
+                />
+              )}
             </div>
+
+            {/* Template selection (optional) */}
+            {templates.length > 0 && (
+              <div className="mb-4">
+                <label className="label flex items-center gap-1.5">
+                  <FileStack className="h-3.5 w-3.5" />
+                  Partir d'un modèle (optionnel)
+                </label>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedTemplate(null)}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+                      !selectedTemplate ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/30'
+                    }`}
+                  >
+                    Devis vierge
+                  </button>
+                  {templates.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => setSelectedTemplate(t.id)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+                        selectedTemplate === t.id ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/30'
+                      }`}
+                    >
+                      {t.nom} ({t.ligne_count} lignes)
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2">
               <button onClick={() => setShowNewModal(false)} className="btn-secondary">Annuler</button>
               <button onClick={handleCreate} disabled={!selectedClient} className="btn-primary">Créer</button>

@@ -80,6 +80,29 @@ const api = {
     getPath: () => ipcRenderer.invoke('backup:getPath')
   },
 
+  // Forfaits
+  forfaits: {
+    list: () => ipcRenderer.invoke('forfaits:list'),
+    get: (id: string) => ipcRenderer.invoke('forfaits:get', id),
+    calculate: (id: string, quantite: number) =>
+      ipcRenderer.invoke('forfaits:calculate', id, quantite),
+    create: (data: Record<string, unknown>) => ipcRenderer.invoke('forfaits:create', data),
+    createFromDevis: (devisId: string, nom: string, uniteBase: string) =>
+      ipcRenderer.invoke('forfaits:createFromDevis', devisId, nom, uniteBase),
+    delete: (id: string) => ipcRenderer.invoke('forfaits:delete', id)
+  },
+
+  // Templates
+  templates: {
+    list: () => ipcRenderer.invoke('templates:list'),
+    get: (id: string) => ipcRenderer.invoke('templates:get', id),
+    createFromDevis: (devisId: string, nom: string) =>
+      ipcRenderer.invoke('templates:createFromDevis', devisId, nom),
+    delete: (id: string) => ipcRenderer.invoke('templates:delete', id),
+    rename: (id: string, nom: string) =>
+      ipcRenderer.invoke('templates:rename', id, nom)
+  },
+
   // Dashboard
   dashboard: {
     stats: () => ipcRenderer.invoke('dashboard:stats')

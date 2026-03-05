@@ -122,6 +122,53 @@ export function createSchema(db: Database): void {
       value INTEGER NOT NULL DEFAULT 0
     );
 
+    -- Forfaits (packs matériaux + main d'oeuvre)
+    CREATE TABLE IF NOT EXISTS forfaits (
+      id TEXT PRIMARY KEY,
+      nom TEXT NOT NULL,
+      description TEXT,
+      unite_base TEXT NOT NULL DEFAULT 'm²',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Lignes de forfait (avec ratio par rapport à l'unité de base)
+    CREATE TABLE IF NOT EXISTS forfait_lignes (
+      id TEXT PRIMARY KEY,
+      forfait_id TEXT NOT NULL,
+      catalogue_item_id TEXT,
+      designation TEXT NOT NULL,
+      description TEXT,
+      unite TEXT NOT NULL DEFAULT 'pce',
+      ratio REAL NOT NULL DEFAULT 1,
+      prix_unitaire REAL NOT NULL DEFAULT 0,
+      ordre INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (forfait_id) REFERENCES forfaits(id) ON DELETE CASCADE,
+      FOREIGN KEY (catalogue_item_id) REFERENCES catalogue(id) ON DELETE SET NULL
+    );
+
+    -- Templates de devis (sauver et réutiliser)
+    CREATE TABLE IF NOT EXISTS devis_templates (
+      id TEXT PRIMARY KEY,
+      nom TEXT NOT NULL,
+      description TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS devis_template_lignes (
+      id TEXT PRIMARY KEY,
+      template_id TEXT NOT NULL,
+      catalogue_item_id TEXT,
+      designation TEXT NOT NULL,
+      description TEXT,
+      unite TEXT NOT NULL DEFAULT 'pce',
+      quantite REAL NOT NULL DEFAULT 1,
+      prix_unitaire REAL NOT NULL DEFAULT 0,
+      ordre INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (template_id) REFERENCES devis_templates(id) ON DELETE CASCADE,
+      FOREIGN KEY (catalogue_item_id) REFERENCES catalogue(id) ON DELETE SET NULL
+    );
+
     -- Licence (with anti-tampering checksum)
     CREATE TABLE IF NOT EXISTS licence (
       id INTEGER PRIMARY KEY CHECK(id = 1),
@@ -182,4 +229,90 @@ export function createSchema(db: Database): void {
   db.run(`INSERT OR IGNORE INTO catalogue (id, reference, designation, type, unite, prix_unitaire, categorie, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`, ['default-MO-008', 'MO-008', 'Prise de mesures sur site', 'main_oeuvre', 'forfait', 150.0, 'Prestations']);
   db.run(`INSERT OR IGNORE INTO catalogue (id, reference, designation, type, unite, prix_unitaire, categorie, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`, ['default-MO-009', 'MO-009', 'Conception et plans', 'main_oeuvre', 'h', 110.0, 'Prestations']);
   db.run(`INSERT OR IGNORE INTO catalogue (id, reference, designation, type, unite, prix_unitaire, categorie, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`, ['default-MO-010', 'MO-010', 'Nettoyage fin de chantier', 'main_oeuvre', 'forfait', 200.0, 'Prestations']);
+
+  // --- Sous-couche parquet (nécessaire pour le forfait) ---
+  db.run(`INSERT OR IGNORE INTO catalogue (id, reference, designation, type, unite, prix_unitaire, categorie, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`, ['default-REV-001', 'REV-001', 'Sous-couche parquet 2mm', 'materiau', 'm²', 5.5, 'Revêtements']);
+  db.run(`INSERT OR IGNORE INTO catalogue (id, reference, designation, type, unite, prix_unitaire, categorie, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`, ['default-REV-002', 'REV-002', 'Plinthe chêne 60mm', 'materiau', 'm', 8.5, 'Revêtements']);
+
+  // ============================================================
+  // Forfaits par défaut — Packs matériaux + main d'oeuvre
+  // ============================================================
+
+  // --- Forfait 1 : Pose parquet (par m²) ---
+  db.run(`INSERT OR IGNORE INTO forfaits (id, nom, description, unite_base) VALUES (?, ?, ?, ?)`,
+    ['forfait-parquet', 'Pose parquet', 'Fourniture et pose de parquet chêne massif avec sous-couche et plinthes', 'm²']);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-parquet-1', 'forfait-parquet', 'default-BOIS-008', 'Parquet chêne massif 15mm', 'm²', 1.1, 78.0, 0]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-parquet-2', 'forfait-parquet', 'default-REV-001', 'Sous-couche parquet 2mm', 'm²', 1.05, 5.5, 1]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-parquet-3', 'forfait-parquet', 'default-REV-002', 'Plinthe chêne 60mm', 'm', 0.8, 8.5, 2]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-parquet-4', 'forfait-parquet', 'default-COLL-001', 'Colle à bois D3 (750g)', 'pce', 0.125, 14.0, 3]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-parquet-5', 'forfait-parquet', 'default-QUIN-001', 'Vis inox 4x40mm (boîte 200)', 'boîte', 0.05, 12.5, 4]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-parquet-6', 'forfait-parquet', 'default-MO-001', 'Menuisier qualifié', 'h', 0.5, 95.0, 5]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-parquet-7', 'forfait-parquet', 'default-MO-003', 'Aide menuisier', 'h', 0.25, 65.0, 6]);
+
+  // --- Forfait 2 : Pose porte intérieure (par pce) ---
+  db.run(`INSERT OR IGNORE INTO forfaits (id, nom, description, unite_base) VALUES (?, ?, ?, ?)`,
+    ['forfait-porte', 'Pose porte intérieure', 'Fourniture et pose de porte avec quincaillerie complète', 'pce']);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-porte-1', 'forfait-porte', null, 'Porte intérieure (à définir)', 'pce', 1, 250.0, 0]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-porte-2', 'forfait-porte', 'default-QUIN-003', 'Charnière porte 100mm (paire)', 'paire', 1.5, 15.0, 1]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-porte-3', 'forfait-porte', 'default-QUIN-004', 'Poignée de porte inox', 'pce', 1, 45.0, 2]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-porte-4', 'forfait-porte', 'default-QUIN-005', 'Serrure à encastrer', 'pce', 1, 65.0, 3]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-porte-5', 'forfait-porte', 'default-MO-001', 'Menuisier qualifié', 'h', 3, 95.0, 4]);
+
+  // --- Forfait 3 : Pose cuisine (par module) ---
+  db.run(`INSERT OR IGNORE INTO forfaits (id, nom, description, unite_base) VALUES (?, ?, ?, ?)`,
+    ['forfait-cuisine', 'Pose cuisine', 'Montage et installation de modules de cuisine avec quincaillerie', 'module']);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-cuisine-1', 'forfait-cuisine', 'default-BOIS-005', 'Panneau mélaminé blanc 19mm', 'm²', 2.5, 32.0, 0]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-cuisine-2', 'forfait-cuisine', 'default-QUIN-006', 'Coulisse tiroir pleine extension 500mm', 'paire', 1, 28.0, 1]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-cuisine-3', 'forfait-cuisine', 'default-QUIN-003', 'Charnière porte 100mm (paire)', 'paire', 2, 15.0, 2]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-cuisine-4', 'forfait-cuisine', 'default-QUIN-004', 'Poignée de porte inox', 'pce', 2, 45.0, 3]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-cuisine-5', 'forfait-cuisine', 'default-MO-001', 'Menuisier qualifié', 'h', 2, 95.0, 4]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-cuisine-6', 'forfait-cuisine', 'default-MO-003', 'Aide menuisier', 'h', 1, 65.0, 5]);
+
+  // --- Forfait 4 : Habillage mural lambris (par m²) ---
+  db.run(`INSERT OR IGNORE INTO forfaits (id, nom, description, unite_base) VALUES (?, ?, ?, ?)`,
+    ['forfait-lambris', 'Habillage mural lambris', 'Fourniture et pose de lambris épicéa avec lattage', 'm²']);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-lambris-1', 'forfait-lambris', 'default-BOIS-009', 'Lambris épicéa 12mm', 'm²', 1.1, 24.0, 0]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-lambris-2', 'forfait-lambris', 'default-BOIS-006', 'Latte sapin 30x50mm', 'm', 2.5, 3.2, 1]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-lambris-3', 'forfait-lambris', 'default-QUIN-001', 'Vis inox 4x40mm (boîte 200)', 'boîte', 0.1, 12.5, 2]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-lambris-4', 'forfait-lambris', 'default-MO-001', 'Menuisier qualifié', 'h', 0.75, 95.0, 3]);
+
+  // --- Forfait 5 : Fabrication meuble sur mesure (forfait) ---
+  db.run(`INSERT OR IGNORE INTO forfaits (id, nom, description, unite_base) VALUES (?, ?, ?, ?)`,
+    ['forfait-meuble', 'Fabrication meuble sur mesure', 'Fabrication en atelier et pose d\'un meuble sur mesure', 'pce']);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-meuble-1', 'forfait-meuble', 'default-BOIS-004', 'Panneau contreplaqué bouleau 18mm', 'm²', 4, 45.0, 0]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-meuble-2', 'forfait-meuble', 'default-QUIN-006', 'Coulisse tiroir pleine extension 500mm', 'paire', 2, 28.0, 1]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-meuble-3', 'forfait-meuble', 'default-QUIN-003', 'Charnière porte 100mm (paire)', 'paire', 3, 15.0, 2]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-meuble-4', 'forfait-meuble', 'default-COLL-002', 'Vernis polyuréthane mat (1L)', 'pce', 1, 32.0, 3]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-meuble-5', 'forfait-meuble', 'default-MO-001', 'Menuisier qualifié', 'h', 16, 95.0, 4]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-meuble-6', 'forfait-meuble', 'default-MO-002', 'Apprenti menuisier', 'h', 8, 45.0, 5]);
+  db.run(`INSERT OR IGNORE INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, unite, ratio, prix_unitaire, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fl-meuble-7', 'forfait-meuble', 'default-MO-006', 'Transport et livraison', 'forfait', 1, 120.0, 6]);
 }

@@ -133,5 +133,74 @@ export interface DashboardStats {
   enAttente: number
 }
 
+// ============================================================
+// Forfaits (packs matériaux + main d'oeuvre)
+// ============================================================
+
+export interface Forfait {
+  id: string
+  nom: string
+  description?: string
+  unite_base: string
+  ligne_count?: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ForfaitLigne {
+  id: string
+  forfait_id: string
+  catalogue_item_id?: string
+  designation: string
+  description?: string
+  unite: string
+  ratio: number
+  prix_unitaire: number
+  ordre: number
+  catalogue_type?: string
+}
+
+export interface ForfaitDetail extends Forfait {
+  lignes: ForfaitLigne[]
+}
+
+export interface ForfaitCalculated {
+  catalogue_item_id: string | null
+  designation: string
+  description: string
+  unite: string
+  quantite: number
+  prix_unitaire: number
+  total: number
+}
+
+// ============================================================
+// Templates de devis
+// ============================================================
+
+export interface DevisTemplate {
+  id: string
+  nom: string
+  description?: string
+  ligne_count?: number
+  created_at: string
+}
+
+export interface DevisTemplateLigne {
+  id: string
+  template_id: string
+  catalogue_item_id?: string
+  designation: string
+  description?: string
+  unite: string
+  quantite: number
+  prix_unitaire: number
+  ordre: number
+}
+
+export interface DevisTemplateDetail extends DevisTemplate {
+  lignes: DevisTemplateLigne[]
+}
+
 export type DevisStatut = Devis['statut']
 export type FactureStatut = Facture['statut']

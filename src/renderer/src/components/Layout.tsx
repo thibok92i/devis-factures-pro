@@ -1,9 +1,25 @@
-import { Outlet } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Outlet, useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import CommandPalette from './CommandPalette'
 import UpdateNotification from './UpdateNotification'
 
 export default function Layout() {
+  const navigate = useNavigate()
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Ctrl+N → Nouveau devis (from anywhere)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault()
+        navigate('/devis?action=new')
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [navigate])
+
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'hsl(var(--background))' }}>
       <Sidebar />
