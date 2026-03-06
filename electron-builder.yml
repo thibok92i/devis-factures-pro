@@ -22,6 +22,7 @@ win:
   icon: build/icon.ico
   artifactName: DevisPro-${version}-setup.${ext}
   sign: null
+  signAndEditExecutable: false
 
 nsis:
   oneClick: true

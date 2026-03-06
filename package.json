@@ -66,10 +66,8 @@
       ],
       "icon": "build/icon.ico",
       "artifactName": "DevisPro-${version}-setup.${ext}",
-      "signingHashAlgorithms": [
-        "sha256"
-      ],
-      "sign": null
+      "sign": null,
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": true,
