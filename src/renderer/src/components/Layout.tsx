@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import CommandPalette from './CommandPalette'
@@ -6,6 +6,7 @@ import UpdateNotification from './UpdateNotification'
 
 export default function Layout() {
   const navigate = useNavigate()
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // Apply dark mode from settings on mount
   useEffect(() => {
@@ -16,6 +17,14 @@ export default function Layout() {
         document.documentElement.classList.remove('dark')
       }
     })
+  }, [])
+
+  // Listen for save errors (antivirus blocking, permissions, etc.)
+  useEffect(() => {
+    const cleanup = window.api.onSaveError?.((data) => {
+      setSaveError(data.message)
+    })
+    return () => cleanup?.()
   }, [])
 
   // Global keyboard shortcuts
@@ -56,6 +65,32 @@ export default function Layout() {
       </main>
       <CommandPalette />
       <UpdateNotification />
+
+      {/* Save error banner */}
+      {saveError && (
+        <div
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-xl rounded-lg border px-5 py-3 shadow-lg"
+          style={{
+            background: 'hsl(0 80% 97%)',
+            borderColor: 'hsl(0 70% 80%)',
+            color: 'hsl(0 70% 35%)'
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <span className="text-lg">⚠️</span>
+            <div className="flex-1">
+              <p className="font-semibold text-sm">Erreur de sauvegarde</p>
+              <p className="text-xs mt-1">{saveError}</p>
+            </div>
+            <button
+              onClick={() => setSaveError(null)}
+              className="text-lg leading-none opacity-60 hover:opacity-100"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

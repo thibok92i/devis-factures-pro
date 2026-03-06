@@ -130,6 +130,13 @@ const api = {
     catalogueImportCsv: () => ipcRenderer.invoke('catalogue:importCsv')
   },
 
+  // Save error listener
+  onSaveError: (callback: (data: { message: string }) => void) => {
+    const handler = (_event: unknown, data: { message: string }) => callback(data)
+    ipcRenderer.on('save-error', handler)
+    return () => ipcRenderer.removeListener('save-error', handler)
+  },
+
   // Auto-Updater
   updater: {
     check: () => ipcRenderer.invoke('updater:check'),

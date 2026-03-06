@@ -1,13 +1,14 @@
 import initSqlJs, { type Database } from 'sql.js'
-import { app } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'fs'
 import { createSchema } from './schema'
 import { encryptBuffer, decryptBuffer, isEncrypted } from '../security/crypto'
 
 let db: Database | null = null
 let dbPath: string = ''
 let saveInterval: ReturnType<typeof setInterval> | null = null
+let consecutiveSaveErrors = 0
 
 export function getDbPath(): string {
   const userDataPath = app.getPath('userData')
@@ -63,17 +64,35 @@ export function getDb(): Database {
 
 /**
  * Save database to disk with AES-256-GCM encryption.
- * The database file is encrypted at rest using a key derived from the machine ID.
- * This means:
- * - The .db file is useless if copied to another machine
- * - Even if someone accesses the user's Documents folder, data is protected
+ * Uses atomic write (write to temp file, then rename) to avoid corruption.
+ * Notifies the user after multiple consecutive failures (e.g. antivirus blocking).
  */
 export function saveToFile(): void {
   if (!db || !dbPath) return
-  const data = db.export()
-  const plainBuffer = Buffer.from(data)
-  const encrypted = encryptBuffer(plainBuffer)
-  writeFileSync(dbPath, encrypted)
+  try {
+    const data = db.export()
+    const plainBuffer = Buffer.from(data)
+    const encrypted = encryptBuffer(plainBuffer)
+    // Atomic write: write to temp file first, then rename
+    const tmpPath = dbPath + '.tmp'
+    writeFileSync(tmpPath, encrypted)
+    renameSync(tmpPath, dbPath)
+    consecutiveSaveErrors = 0
+  } catch (err) {
+    consecutiveSaveErrors++
+    console.error(`[DB] Save failed (attempt #${consecutiveSaveErrors}):`, err)
+    // After 3 consecutive failures, warn the user
+    if (consecutiveSaveErrors === 3) {
+      const win = BrowserWindow.getAllWindows()[0]
+      if (win) {
+        win.webContents.send('save-error', {
+          message: 'Impossible de sauvegarder les données sur le disque. ' +
+            'Vérifiez que votre antivirus (Norton, etc.) ne bloque pas DevisPro. ' +
+            'Chemin: ' + dbPath
+        })
+      }
+    }
+  }
 }
 
 export function closeDb(): void {

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, shell, session, Menu } from 'electron'
 import { join } from 'path'
+import { existsSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDatabase, closeDb } from './database'
 import { registerAllHandlers } from './ipc'
@@ -7,6 +8,17 @@ import { startAutoBackup, stopAutoBackup } from './services/backup'
 import { initAutoUpdater } from './services/updater'
 
 let mainWindow: BrowserWindow | null = null
+
+function getAppIcon(): string | undefined {
+  // In production: icon is in resources/ (via extraResources)
+  // In dev: icon is in build/ at project root
+  const candidates = [
+    join(process.resourcesPath, 'icon.png'),           // production
+    join(__dirname, '../../resources/icon.png'),         // dev (from out/main/)
+    join(__dirname, '../../build/icon.png')              // dev fallback
+  ]
+  return candidates.find((p) => existsSync(p))
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -16,7 +28,7 @@ function createWindow(): void {
     minHeight: 700,
     show: false,
     title: 'DevisPro',
-    icon: join(__dirname, '../../build/icon.png'),
+    icon: getAppIcon(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: true,
