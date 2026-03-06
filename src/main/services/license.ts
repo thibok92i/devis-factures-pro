@@ -2,14 +2,17 @@
  * License System with Anti-Tampering
  *
  * Features:
- * - License key format validation (XXXX-XXXX-XXXX-XXXX)
+ * - License key validation with cryptographic checksum
  * - Hardware fingerprint binding (machine ID)
  * - SHA-256 hashed key storage (original key not stored)
  * - HMAC integrity checksum to detect manual DB edits
- * - Ready for server-side validation (Keygen.sh, LemonSqueezy, etc.)
+ * - Only keys generated with generate-license.mjs are accepted
  *
- * To add server validation later, modify activateLicense() to call
- * your license server API before saving to the database.
+ * Key format: XXXX-XXXX-XXXX-XXXX
+ * The first 3 groups are random, the 4th group is a HMAC checksum.
+ * Only keys where the 4th group matches are valid.
+ *
+ * To generate keys: node scripts/generate-license.mjs [count]
  */
 
 import { createHash, createHmac } from 'crypto'
@@ -18,6 +21,21 @@ import { queryOne, execute, saveToFile } from '../database'
 
 // Secret salt for integrity checks — changing this invalidates all existing licenses
 const INTEGRITY_SECRET = 'DPro-2024-integrity-check-v1'
+
+// Secret for license key validation — must match generate-license.mjs
+const LICENSE_KEY_SECRET = 'DPro-artisan-suisse-2024-clef'
+const VALID_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+
+/**
+ * Compute the checksum group (4th group) from the first 3 groups.
+ * Uses HMAC-SHA256 with a secret, mapped to A-Z0-9.
+ */
+function computeKeyChecksum(payload: string): string {
+  const hmac = createHmac('sha256', LICENSE_KEY_SECRET).update(payload).digest()
+  return Array.from(hmac.slice(0, 4))
+    .map((b) => VALID_CHARS[b % 36])
+    .join('')
+}
 
 function getMachineId(): string {
   try { return machineIdSync() } catch { return 'unknown-machine' }
@@ -50,16 +68,30 @@ export function validateLicenseFormat(key: string): boolean {
 }
 
 /**
+ * Validate license key authenticity.
+ * Checks format AND that the 4th group is a valid HMAC checksum of the first 3 groups.
+ * Only keys generated with generate-license.mjs will pass.
+ */
+export function validateLicenseKey(key: string): boolean {
+  const upper = key.toUpperCase().trim()
+  if (!validateLicenseFormat(upper)) return false
+  const parts = upper.split('-')
+  const payload = parts.slice(0, 3).join('-')
+  const checkGroup = parts[3]
+  return computeKeyChecksum(payload) === checkGroup
+}
+
+/**
  * Activate a license key.
- * Validates format, binds to machine, stores with integrity checksum.
- *
- * TODO: Add server-side validation here:
- *   const response = await fetch('https://api.keygen.sh/v1/licenses/actions/validate', { ... })
- *   if (!response.ok) return { success: false, message: 'Clé invalide' }
+ * Validates format + cryptographic checksum, binds to machine, stores with integrity.
  */
 export function activateLicense(key: string): { success: boolean; message: string } {
   if (!validateLicenseFormat(key)) {
     return { success: false, message: 'Format de clé invalide. Format attendu: XXXX-XXXX-XXXX-XXXX' }
+  }
+
+  if (!validateLicenseKey(key)) {
+    return { success: false, message: 'Clé de licence invalide.' }
   }
 
   const machineId = getMachineId()
