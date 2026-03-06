@@ -15,9 +15,21 @@
  */
 
 import { createHmac, randomBytes } from 'crypto'
+import { readFileSync } from 'fs'
+import { resolve, dirname } from 'path'
+import { fileURLToPath } from 'url'
 
-// ⚠️ This secret MUST match the one in src/main/services/license.ts
-const LICENSE_KEY_SECRET = 'DPro-artisan-suisse-2024-clef'
+// Load secret from .env file (not in source code!)
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const envPath = resolve(__dirname, '..', '.env')
+const envContent = readFileSync(envPath, 'utf8')
+const match = envContent.match(/LICENSE_KEY_SECRET=(.+)/)
+const LICENSE_KEY_SECRET = match ? match[1].trim() : ''
+
+if (!LICENSE_KEY_SECRET) {
+  console.error('❌ LICENSE_KEY_SECRET introuvable dans .env !')
+  process.exit(1)
+}
 const VALID_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
 function randomGroup() {

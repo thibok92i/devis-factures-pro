@@ -41,7 +41,8 @@ export function registerFactureHandlers(): void {
       const factureId = uuid()
       const counter = queryOne("SELECT value FROM counters WHERE name = 'facture'") as { value: number }
       const nextNum = counter.value + 1
-      const numero = `F-${String(nextNum).padStart(4, '0')}`
+      const fPrefix = (queryOne("SELECT value FROM settings WHERE key = 'facture_prefix'") as { value: string } | undefined)?.value || 'F'
+      const numero = `${fPrefix}-${String(nextNum).padStart(4, '0')}`
       execute("UPDATE counters SET value = ? WHERE name = 'facture'", [nextNum])
       execute(
         `INSERT INTO factures (id, numero, devis_id, client_id, date, echeance, statut,
@@ -76,7 +77,8 @@ export function registerFactureHandlers(): void {
       const id = uuid()
       const counter = queryOne("SELECT value FROM counters WHERE name = 'facture'") as { value: number }
       const nextNum = counter.value + 1
-      const numero = `F-${String(nextNum).padStart(4, '0')}`
+      const fPrefix = (queryOne("SELECT value FROM settings WHERE key = 'facture_prefix'") as { value: string } | undefined)?.value || 'F'
+      const numero = `${fPrefix}-${String(nextNum).padStart(4, '0')}`
       execute("UPDATE counters SET value = ? WHERE name = 'facture'", [nextNum])
       execute(
         `INSERT INTO factures (id, numero, client_id, date, echeance, statut, notes, conditions) VALUES (?, ?, ?, ?, ?, 'brouillon', ?, ?)`,
@@ -160,7 +162,7 @@ export function registerFactureHandlers(): void {
     const lignes = queryAll('SELECT * FROM facture_lignes WHERE facture_id = ? ORDER BY ordre', [validId])
     const settingsRows = queryAll('SELECT key, value FROM settings') as Array<{ key: string; value: string }>
     const settings = Object.fromEntries(settingsRows.map((r) => [r.key, r.value]))
-    const html = generateFactureHtml(facture, lignes, settings)
+    const html = await generateFactureHtml(facture, lignes, settings)
     const defaultPath = getDefaultExportPath('facture', facture.numero as string)
     const { filePath } = await dialog.showSaveDialog({ defaultPath, filters: [{ name: 'PDF', extensions: ['pdf'] }] })
     if (!filePath) return { success: false, message: 'Export annulé' }

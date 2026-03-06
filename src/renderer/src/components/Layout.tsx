@@ -7,6 +7,17 @@ import UpdateNotification from './UpdateNotification'
 export default function Layout() {
   const navigate = useNavigate()
 
+  // Apply dark mode from settings on mount
+  useEffect(() => {
+    window.api.settings.get('theme_mode').then((mode: string | null) => {
+      if (mode === 'dark') {
+        document.documentElement.classList.add('dark')
+      } else {
+        document.documentElement.classList.remove('dark')
+      }
+    })
+  }, [])
+
   // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

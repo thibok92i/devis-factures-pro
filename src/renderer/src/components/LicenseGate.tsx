@@ -35,8 +35,8 @@ export default function LicenseGate({ children }: LicenseGateProps) {
       } else {
         setError(result.message)
       }
-    } catch {
-      setError("Erreur lors de l'activation")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors de l'activation")
     } finally {
       setActivating(false)
     }

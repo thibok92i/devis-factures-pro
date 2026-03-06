@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Save, Key, HardDrive, Building2, Landmark, ReceiptText, Clock } from 'lucide-react'
+import { Save, Key, HardDrive, Building2, Landmark, ReceiptText, Clock, ImagePlus, Hash, Moon, Sun, FileText, Upload, X } from 'lucide-react'
 import { useToast } from '../components/Toast'
 
 export default function Settings() {
@@ -54,6 +54,42 @@ export default function Settings() {
     }
   }
 
+  const handleUploadLogo = async () => {
+    try {
+      const result = await window.api.settings.uploadLogo()
+      if (result.success && result.logo) {
+        setSettings((prev) => ({ ...prev, entreprise_logo: result.logo }))
+        toast.success('Logo importé')
+      } else if (result.error) {
+        toast.error(result.error)
+      }
+    } catch {
+      toast.error("Erreur lors de l'import du logo")
+    }
+  }
+
+  const handleRemoveLogo = () => {
+    setSettings((prev) => {
+      const next = { ...prev }
+      delete next.entreprise_logo
+      return next
+    })
+    toast.info('Logo supprimé (sauvegarder pour confirmer)')
+  }
+
+  const handleToggleDarkMode = () => {
+    const isDark = settings.theme_mode === 'dark'
+    const newMode = isDark ? 'light' : 'dark'
+    updateSetting('theme_mode', newMode)
+    if (newMode === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }
+
+  const isDark = settings.theme_mode === 'dark'
+
   return (
     <div className="max-w-3xl">
       <div className="page-header">
@@ -64,6 +100,25 @@ export default function Settings() {
         </button>
       </div>
 
+      {/* Theme toggle */}
+      <div className="card mb-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {isDark ? <Moon className="h-5 w-5 text-primary" /> : <Sun className="h-5 w-5" style={{ color: 'hsl(35 80% 50%)' }} />}
+            <h2 className="text-lg font-semibold text-foreground">Apparence</h2>
+          </div>
+          <button
+            onClick={handleToggleDarkMode}
+            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${isDark ? 'bg-primary' : 'bg-muted'}`}
+          >
+            <span className={`inline-block h-5 w-5 rounded-full bg-white transition-transform shadow-sm ${isDark ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {isDark ? 'Mode sombre activé' : 'Mode clair activé'}. Le thème est appliqué immédiatement.
+        </p>
+      </div>
+
       {/* Company info */}
       <div className="card mb-6">
         <div className="mb-4 flex items-center gap-2">
@@ -71,6 +126,28 @@ export default function Settings() {
           <h2 className="text-lg font-semibold text-foreground">Informations entreprise</h2>
         </div>
         <div className="space-y-3">
+          {/* Logo */}
+          <div>
+            <label className="label">Logo entreprise</label>
+            <div className="flex items-center gap-4">
+              {settings.entreprise_logo ? (
+                <div className="relative group">
+                  <img src={settings.entreprise_logo} alt="Logo" className="h-16 max-w-[180px] object-contain rounded border border-border p-1" />
+                  <button onClick={handleRemoveLogo} className="absolute -top-2 -right-2 rounded-full bg-destructive text-white p-0.5 opacity-0 group-hover:opacity-100 transition-opacity" title="Supprimer">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex h-16 w-32 items-center justify-center rounded border border-dashed border-border">
+                  <ImagePlus className="h-6 w-6 text-muted-foreground/40" />
+                </div>
+              )}
+              <button onClick={handleUploadLogo} className="btn-secondary text-sm">
+                <Upload className="h-3.5 w-3.5" />
+                {settings.entreprise_logo ? 'Changer' : 'Importer'}
+              </button>
+            </div>
+          </div>
           <div>
             <label className="label">Nom de l'entreprise</label>
             <input className="input" value={settings.entreprise_nom || ''} onChange={(e) => updateSetting('entreprise_nom', e.target.value)} placeholder="Menuiserie Dupont" />
@@ -112,6 +189,27 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* Numérotation */}
+      <div className="card mb-6">
+        <div className="mb-4 flex items-center gap-2">
+          <Hash className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold text-foreground">Numérotation</h2>
+        </div>
+        <p className="text-sm text-muted-foreground mb-3">
+          Personnalisez les préfixes des numéros de devis et factures. Exemple : D-0001, F-0001.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Préfixe devis</label>
+            <input className="input" value={settings.devis_prefix || 'D'} onChange={(e) => updateSetting('devis_prefix', e.target.value)} placeholder="D" maxLength={10} />
+          </div>
+          <div>
+            <label className="label">Préfixe facture</label>
+            <input className="input" value={settings.facture_prefix || 'F'} onChange={(e) => updateSetting('facture_prefix', e.target.value)} placeholder="F" maxLength={10} />
+          </div>
+        </div>
+      </div>
+
       {/* TVA & Conditions */}
       <div className="card mb-6">
         <div className="mb-4 flex items-center gap-2">
@@ -136,6 +234,22 @@ export default function Settings() {
           <div>
             <label className="label">Conditions facture</label>
             <textarea className="input" rows={2} value={settings.conditions_facture || ''} onChange={(e) => updateSetting('conditions_facture', e.target.value)} />
+          </div>
+
+          {/* Mentions légales */}
+          <div className="border-t border-border pt-3 mt-3">
+            <div className="mb-2 flex items-center gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground">Mentions légales (pied de page PDF)</span>
+            </div>
+            <div>
+              <label className="label">Mentions devis</label>
+              <textarea className="input" rows={2} value={settings.mentions_devis || ''} onChange={(e) => updateSetting('mentions_devis', e.target.value)} placeholder="Ex: TVA non applicable, art. 293 B du CGI" />
+            </div>
+            <div className="mt-3">
+              <label className="label">Mentions facture</label>
+              <textarea className="input" rows={2} value={settings.mentions_facture || ''} onChange={(e) => updateSetting('mentions_facture', e.target.value)} placeholder="Ex: Pénalités de retard: 3x taux d'intérêt légal" />
+            </div>
           </div>
 
           {/* Délais */}
@@ -164,6 +278,9 @@ export default function Settings() {
           <Landmark className="h-5 w-5" style={{ color: 'hsl(145 60% 40%)' }} />
           <h2 className="text-lg font-semibold text-foreground">Informations bancaires</h2>
         </div>
+        <p className="text-sm text-muted-foreground mb-3">
+          L'IBAN est utilisé pour générer le QR-code de paiement suisse sur les factures.
+        </p>
         <div className="space-y-3">
           <div>
             <label className="label">IBAN</label>

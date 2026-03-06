@@ -39,7 +39,8 @@ export function registerDevisHandlers(): void {
       const id = uuid()
       const counter = queryOne("SELECT value FROM counters WHERE name = 'devis'") as { value: number }
       const nextNum = counter.value + 1
-      const numero = `D-${String(nextNum).padStart(4, '0')}`
+      const prefix = (queryOne("SELECT value FROM settings WHERE key = 'devis_prefix'") as { value: string } | undefined)?.value || 'D'
+      const numero = `${prefix}-${String(nextNum).padStart(4, '0')}`
       execute("UPDATE counters SET value = ? WHERE name = 'devis'", [nextNum])
       // Feature 3: Auto-fill conditions from settings if not provided
     let conditions = v.conditions
@@ -162,7 +163,8 @@ export function registerDevisHandlers(): void {
       const newId = uuid()
       const counter = queryOne("SELECT value FROM counters WHERE name = 'devis'") as { value: number }
       const nextNum = counter.value + 1
-      const newNumero = `D-${String(nextNum).padStart(4, '0')}`
+      const prefix = (queryOne("SELECT value FROM settings WHERE key = 'devis_prefix'") as { value: string } | undefined)?.value || 'D'
+      const newNumero = `${prefix}-${String(nextNum).padStart(4, '0')}`
       execute("UPDATE counters SET value = ? WHERE name = 'devis'", [nextNum])
 
       const today = new Date().toISOString().slice(0, 10)

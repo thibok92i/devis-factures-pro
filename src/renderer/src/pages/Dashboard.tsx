@@ -1,21 +1,90 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Users, FileText, Receipt, TrendingUp, Clock, Plus, ArrowRight, Package } from 'lucide-react'
-import { formatCHF, formatDate, clientDisplayName, devisStatutLabel, devisStatutColor, factureStatutLabel, factureStatutColor } from '../utils/format'
+import { Users, FileText, TrendingUp, Clock, Plus, ArrowRight, Package } from 'lucide-react'
+import { formatCHF, clientDisplayName, devisStatutLabel, devisStatutColor, factureStatutLabel, factureStatutColor } from '../utils/format'
 import type { DashboardStats } from '../types'
 
 const dayNames = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi']
+const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+
+interface MonthlyData {
+  mois: string
+  encaisse: number
+  facture: number
+}
+
+function RevenueChart({ data }: { data: MonthlyData[] }) {
+  if (data.length === 0) return null
+
+  const maxVal = Math.max(...data.map((d) => Math.max(d.encaisse, d.facture)), 1)
+  const chartH = 160
+  const barW = Math.min(28, Math.floor(500 / data.length) - 8)
+
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-foreground">Chiffre d'affaires mensuel</h3>
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded" style={{ background: 'hsl(152 45% 28%)' }} />
+            Encaissé
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded" style={{ background: 'hsl(152 45% 28% / 0.25)' }} />
+            Facturé
+          </span>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <svg width="100%" viewBox={`0 0 ${data.length * (barW + 8) + 40} ${chartH + 40}`} className="min-w-[400px]">
+          {/* Grid lines */}
+          {[0, 0.25, 0.5, 0.75, 1].map((pct) => {
+            const y = chartH - chartH * pct + 10
+            return (
+              <g key={pct}>
+                <line x1="35" y1={y} x2={data.length * (barW + 8) + 35} y2={y} stroke="hsl(var(--border))" strokeWidth="1" strokeDasharray={pct === 0 ? '' : '4,4'} />
+                {pct > 0 && (
+                  <text x="32" y={y + 3} textAnchor="end" fontSize="8" fill="hsl(var(--muted-foreground))">
+                    {Math.round(maxVal * pct)}
+                  </text>
+                )}
+              </g>
+            )
+          })}
+          {/* Bars */}
+          {data.map((d, i) => {
+            const x = i * (barW + 8) + 40
+            const hFact = (d.facture / maxVal) * chartH
+            const hEnc = (d.encaisse / maxVal) * chartH
+            const month = parseInt(d.mois.split('-')[1]) - 1
+            return (
+              <g key={d.mois}>
+                <rect x={x} y={chartH - hFact + 10} width={barW} height={hFact} rx="3" fill="hsl(152 45% 28% / 0.2)" />
+                <rect x={x} y={chartH - hEnc + 10} width={barW} height={hEnc} rx="3" fill="hsl(152 45% 28%)" />
+                <text x={x + barW / 2} y={chartH + 24} textAnchor="middle" fontSize="9" fill="hsl(var(--muted-foreground))">
+                  {monthNames[month]}
+                </text>
+              </g>
+            )
+          })}
+        </svg>
+      </div>
+    </div>
+  )
+}
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [recentDevis, setRecentDevis] = useState<any[]>([])
   const [recentFactures, setRecentFactures] = useState<any[]>([])
+  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([])
   const navigate = useNavigate()
 
   useEffect(() => {
     window.api.dashboard.stats().then(setStats)
     window.api.devis.list().then((list: any[]) => setRecentDevis((list || []).slice(0, 5)))
     window.api.factures.list().then((list: any[]) => setRecentFactures((list || []).slice(0, 5)))
+    window.api.dashboard.monthlyRevenue().then((data: MonthlyData[]) => setMonthlyData(data || []))
   }, [])
 
   if (!stats) {
@@ -106,6 +175,13 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Revenue chart */}
+      {monthlyData.length > 0 && (
+        <div className="mb-8">
+          <RevenueChart data={monthlyData} />
+        </div>
+      )}
 
       {/* Main content grid */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 flex-1">

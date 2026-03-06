@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, FileText, Receipt, Pencil, Plus, Mail, Phone, MapPin } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import ClientForm from '../components/ClientForm'
 import {
   formatCHF,
   formatDate,
@@ -22,29 +23,41 @@ export default function ClientDetail() {
   const [devis, setDevis] = useState<DevisWithClient[]>([])
   const [factures, setFactures] = useState<FactureWithClient[]>([])
   const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(false)
+
+  const loadData = async () => {
+    if (!id) return
+    try {
+      const [clientData, allDevis, allFactures] = await Promise.all([
+        window.api.clients.get(id),
+        window.api.devis.list(),
+        window.api.factures.list()
+      ])
+      setClient(clientData)
+      setDevis((allDevis || []).filter((d: DevisWithClient) => d.client_id === id))
+      setFactures((allFactures || []).filter((f: FactureWithClient) => f.client_id === id))
+    } catch {
+      toast.error('Erreur lors du chargement du client')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    if (!id) return
-
-    const loadData = async () => {
-      try {
-        const [clientData, allDevis, allFactures] = await Promise.all([
-          window.api.clients.get(id),
-          window.api.devis.list(),
-          window.api.factures.list()
-        ])
-        setClient(clientData)
-        setDevis((allDevis || []).filter((d: DevisWithClient) => d.client_id === id))
-        setFactures((allFactures || []).filter((f: FactureWithClient) => f.client_id === id))
-      } catch {
-        toast.error('Erreur lors du chargement du client')
-      } finally {
-        setLoading(false)
-      }
-    }
-
     loadData()
   }, [id])
+
+  const handleEditSave = async (data: Partial<Client>) => {
+    if (!id) return
+    try {
+      await window.api.clients.update(id, data)
+      toast.success('Client mis à jour')
+      setEditing(false)
+      loadData()
+    } catch {
+      toast.error('Erreur lors de la mise à jour')
+    }
+  }
 
   if (loading) {
     return (
@@ -92,7 +105,7 @@ export default function ClientDetail() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => toast.info('Modification en cours de développement')}
+            onClick={() => setEditing(true)}
             className="btn-secondary"
           >
             <Pencil className="h-4 w-4" />
@@ -266,6 +279,15 @@ export default function ClientDetail() {
           </table>
         </div>
       </div>
+
+      {/* Edit modal */}
+      {editing && (
+        <ClientForm
+          client={client}
+          onSave={handleEditSave}
+          onCancel={() => setEditing(false)}
+        />
+      )}
     </div>
   )
 }

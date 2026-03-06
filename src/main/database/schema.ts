@@ -194,6 +194,13 @@ export function createSchema(db: Database): void {
     INSERT OR IGNORE INTO settings (key, value) VALUES ('delai_paiement_facture', '30');
   `)
 
+  // Migration: add checksum to licence table (for existing DBs created before v1.0.2)
+  try {
+    db.run(`ALTER TABLE licence ADD COLUMN checksum TEXT`)
+  } catch {
+    // Column already exists, ignore
+  }
+
   // Migration: add is_favorite to catalogue (Feature 5)
   try {
     db.run(`ALTER TABLE catalogue ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0`)

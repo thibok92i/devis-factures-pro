@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Trash2, Download, CheckCircle, Receipt } from 'lucide-react'
+import { Search, Trash2, Download, CheckCircle, Receipt, FileSpreadsheet, AlertTriangle } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { useApiData, useApiCall } from '../hooks/useApi'
 import { formatCHF, formatDate, clientDisplayName, factureStatutLabel, factureStatutColor } from '../utils/format'
@@ -13,6 +13,17 @@ const statusFilters = [
   { value: 'payee', label: 'Payées' },
   { value: 'en_retard', label: 'En retard' },
 ]
+
+function isOverdue(f: FactureWithClient): boolean {
+  if (f.statut === 'payee' || f.statut === 'brouillon') return false
+  const today = new Date().toISOString().slice(0, 10)
+  return f.echeance < today
+}
+
+function daysOverdue(echeance: string): number {
+  const diff = Date.now() - new Date(echeance).getTime()
+  return Math.floor(diff / 86400000)
+}
 
 export default function FacturesList() {
   const { data: factures, refresh } = useApiData(() => window.api.factures.list())
@@ -34,6 +45,7 @@ export default function FacturesList() {
 
   const totalEncaisse = allFactures.filter((f: FactureWithClient) => f.statut === 'payee').reduce((sum: number, f: FactureWithClient) => sum + f.total, 0)
   const totalEnAttente = allFactures.filter((f: FactureWithClient) => f.statut !== 'payee').reduce((sum: number, f: FactureWithClient) => sum + f.total, 0)
+  const overdueCount = allFactures.filter((f: FactureWithClient) => isOverdue(f)).length
 
   const handleDelete = async (id: string) => {
     if (confirm('Supprimer cette facture ?')) {
@@ -54,12 +66,50 @@ export default function FacturesList() {
     toast.success('PDF exporté')
   }
 
+  const handleExportCsv = async () => {
+    try {
+      const result = await window.api.export.facturesCsv()
+      if (result.success) {
+        toast.success(`${result.count} factures exportées en CSV`)
+      } else if (result.error) {
+        toast.error(result.error)
+      }
+    } catch {
+      toast.error("Erreur lors de l'export")
+    }
+  }
+
+  const handleMarkOverdue = async () => {
+    const overdueFactures = allFactures.filter((f: FactureWithClient) => isOverdue(f) && f.statut === 'envoyee')
+    for (const f of overdueFactures) {
+      await execute(() => window.api.factures.updateStatut(f.id, 'en_retard'))
+    }
+    if (overdueFactures.length > 0) {
+      refresh()
+      toast.success(`${overdueFactures.length} facture(s) marquée(s) en retard`)
+    } else {
+      toast.info('Aucune facture en retard à mettre à jour')
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
         <div>
           <h1 className="page-title">Factures</h1>
           <p className="page-subtitle">Les factures sont créées depuis les devis acceptés</p>
+        </div>
+        <div className="flex gap-2">
+          {overdueCount > 0 && (
+            <button onClick={handleMarkOverdue} className="btn-secondary text-sm" style={{ color: 'hsl(0 70% 55%)' }} title="Marquer les factures échues comme en retard">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {overdueCount} en retard
+            </button>
+          )}
+          <button onClick={handleExportCsv} className="btn-secondary text-sm">
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            Export CSV
+          </button>
         </div>
       </div>
 
@@ -128,33 +178,41 @@ export default function FacturesList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map((f: FactureWithClient) => (
-                <tr key={f.id} className="table-row cursor-pointer group" onClick={() => navigate(`/factures/${f.id}`)}>
-                  <td className="px-4 py-3 font-medium text-primary">{f.numero}</td>
-                  <td className="px-4 py-3 text-sm text-foreground">{clientDisplayName({ nom: f.client_nom, prenom: f.client_prenom, entreprise: f.client_entreprise })}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(f.date)}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(f.echeance)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`badge ${factureStatutColor(f.statut)}`}>{factureStatutLabel(f.statut)}</span>
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium text-foreground">{formatCHF(f.total)}</td>
-                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => handleExportPdf(f.id)} className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-primary transition-colors" title="PDF">
-                        <Download className="h-4 w-4" />
-                      </button>
-                      {f.statut !== 'payee' && (
-                        <button onClick={() => handleMarkPaid(f.id)} className="rounded p-1.5 text-muted-foreground hover:bg-accent/10 hover:text-accent transition-colors" title="Marquer payée">
-                          <CheckCircle className="h-4 w-4" />
+              {filtered.map((f: FactureWithClient) => {
+                const overdue = isOverdue(f)
+                return (
+                  <tr key={f.id} className={`table-row cursor-pointer group ${overdue ? 'bg-destructive/5' : ''}`} onClick={() => navigate(`/factures/${f.id}`)}>
+                    <td className="px-4 py-3 font-medium text-primary">{f.numero}</td>
+                    <td className="px-4 py-3 text-sm text-foreground">{clientDisplayName({ nom: f.client_nom, prenom: f.client_prenom, entreprise: f.client_entreprise })}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(f.date)}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <span className={overdue ? 'text-destructive font-medium' : 'text-muted-foreground'}>
+                        {formatDate(f.echeance)}
+                        {overdue && <span className="ml-1 text-xs">({daysOverdue(f.echeance)}j)</span>}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`badge ${factureStatutColor(f.statut)}`}>{factureStatutLabel(f.statut)}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium text-foreground">{formatCHF(f.total)}</td>
+                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handleExportPdf(f.id)} className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-primary transition-colors" title="PDF">
+                          <Download className="h-4 w-4" />
                         </button>
-                      )}
-                      <button onClick={() => handleDelete(f.id)} className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors" title="Supprimer">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {f.statut !== 'payee' && (
+                          <button onClick={() => handleMarkPaid(f.id)} className="rounded p-1.5 text-muted-foreground hover:bg-accent/10 hover:text-accent transition-colors" title="Marquer payée">
+                            <CheckCircle className="h-4 w-4" />
+                          </button>
+                        )}
+                        <button onClick={() => handleDelete(f.id)} className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors" title="Supprimer">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center">

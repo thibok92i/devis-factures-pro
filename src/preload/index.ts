@@ -65,7 +65,8 @@ const api = {
     get: (key: string) => ipcRenderer.invoke('settings:get', key),
     set: (key: string, value: string) => ipcRenderer.invoke('settings:set', key, value),
     setMultiple: (settings: Record<string, string>) =>
-      ipcRenderer.invoke('settings:setMultiple', settings)
+      ipcRenderer.invoke('settings:setMultiple', settings),
+    uploadLogo: () => ipcRenderer.invoke('settings:uploadLogo')
   },
 
   // License
@@ -106,7 +107,14 @@ const api = {
 
   // Dashboard
   dashboard: {
-    stats: () => ipcRenderer.invoke('dashboard:stats')
+    stats: () => ipcRenderer.invoke('dashboard:stats'),
+    monthlyRevenue: () => ipcRenderer.invoke('dashboard:monthlyRevenue')
+  },
+
+  // Export
+  export: {
+    facturesCsv: () => ipcRenderer.invoke('export:facturesCsv'),
+    catalogueImportCsv: () => ipcRenderer.invoke('catalogue:importCsv')
   },
 
   // Auto-Updater

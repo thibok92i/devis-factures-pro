@@ -269,12 +269,18 @@ const ALLOWED_SETTINGS_KEYS = new Set([
   'entreprise_numero_tva',
   'entreprise_iban',
   'entreprise_banque',
+  'entreprise_logo',
   'tva_taux',
   'devise',
   'conditions_devis',
   'conditions_facture',
   'delai_validite_devis',
-  'delai_paiement_facture'
+  'delai_paiement_facture',
+  'devis_prefix',
+  'facture_prefix',
+  'theme_mode',
+  'mentions_devis',
+  'mentions_facture'
 ])
 
 export function validateSettingsKey(key: string): string {
@@ -286,8 +292,12 @@ export function validateSettingsKey(key: string): string {
 }
 
 export function validateSettingsValue(key: string, value: unknown): string {
-  const str = sanitizeString(value)
-  if (str.length > 2000) {
+  // Logo is base64-encoded, allow larger values (up to 200KB)
+  const maxLength = key === 'entreprise_logo' ? 200000 : 2000
+  if (typeof value !== 'string') throw new ValidationError('Valeur texte attendue')
+  // Skip HTML sanitization for logo (it's base64 data)
+  const str = key === 'entreprise_logo' ? value.trim() : sanitizeString(value)
+  if (str.length > maxLength) {
     throw new ValidationError(`La valeur du réglage "${key}" est trop longue`)
   }
   return str

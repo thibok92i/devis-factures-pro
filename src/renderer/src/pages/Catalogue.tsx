@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, Search, Pencil, Trash2, X, Package, Wrench, Star } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, X, Package, Wrench, Star, Upload } from 'lucide-react'
 import { useApiData, useApiCall } from '../hooks/useApi'
 import { useToast } from '../components/Toast'
 import { formatCHF } from '../utils/format'
@@ -136,6 +136,20 @@ export default function Catalogue() {
     refresh()
   }
 
+  const handleImportCsv = async () => {
+    try {
+      const result = await window.api.export.catalogueImportCsv()
+      if (result.success) {
+        toast.success(`${result.count} articles importés`)
+        refresh()
+      } else if (result.error) {
+        toast.error(result.error)
+      }
+    } catch {
+      toast.error("Erreur lors de l'import")
+    }
+  }
+
   const handleDelete = async (id: string) => {
     if (confirm('Supprimer cet article ?')) {
       await execute(() => window.api.catalogue.delete(id))
@@ -151,10 +165,16 @@ export default function Catalogue() {
           <h1 className="page-title">Catalogue</h1>
           <p className="page-subtitle">{(items || []).length} article{(items || []).length > 1 ? 's' : ''}</p>
         </div>
-        <button onClick={() => setCreating(true)} className="btn-primary">
-          <Plus className="h-4 w-4" />
-          Nouvel article
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handleImportCsv} className="btn-secondary text-sm">
+            <Upload className="h-3.5 w-3.5" />
+            Import CSV
+          </button>
+          <button onClick={() => setCreating(true)} className="btn-primary">
+            <Plus className="h-4 w-4" />
+            Nouvel article
+          </button>
+        </div>
       </div>
 
       {/* Search + Type filter */}

@@ -22,8 +22,11 @@ import { queryOne, execute, saveToFile } from '../database'
 // Secret salt for integrity checks — changing this invalidates all existing licenses
 const INTEGRITY_SECRET = 'DPro-2024-integrity-check-v1'
 
-// Secret for license key validation — must match generate-license.mjs
-const LICENSE_KEY_SECRET = 'DPro-artisan-suisse-2024-clef'
+// Secret for license key validation — injected at build time from .env
+const LICENSE_KEY_SECRET = process.env.LICENSE_KEY_SECRET || ''
+if (!LICENSE_KEY_SECRET) {
+  console.error('[License] CRITICAL: LICENSE_KEY_SECRET is empty! License validation will reject all keys.')
+}
 const VALID_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
 /**
@@ -73,6 +76,7 @@ export function validateLicenseFormat(key: string): boolean {
  * Only keys generated with generate-license.mjs will pass.
  */
 export function validateLicenseKey(key: string): boolean {
+  if (!LICENSE_KEY_SECRET) return false // Reject all keys if secret is missing
   const upper = key.toUpperCase().trim()
   if (!validateLicenseFormat(upper)) return false
   const parts = upper.split('-')
@@ -86,36 +90,66 @@ export function validateLicenseKey(key: string): boolean {
  * Validates format + cryptographic checksum, binds to machine, stores with integrity.
  */
 export function activateLicense(key: string): { success: boolean; message: string } {
-  if (!validateLicenseFormat(key)) {
-    return { success: false, message: 'Format de clé invalide. Format attendu: XXXX-XXXX-XXXX-XXXX' }
+  try {
+    console.log('[License] Activation attempt for key:', key.slice(0, 4) + '-****')
+
+    if (!validateLicenseFormat(key)) {
+      console.log('[License] Format validation failed')
+      return { success: false, message: 'Format de clé invalide. Format attendu: XXXX-XXXX-XXXX-XXXX' }
+    }
+
+    if (!validateLicenseKey(key)) {
+      console.log('[License] Key checksum validation failed')
+      return { success: false, message: 'Clé de licence invalide.' }
+    }
+
+    console.log('[License] Key validated, getting machine ID...')
+    const machineId = getMachineId()
+    console.log('[License] Machine ID:', machineId.slice(0, 8) + '...')
+
+    // Check if already activated
+    const existing = queryOne('SELECT * FROM licence WHERE id = 1') as {
+      key: string
+      is_active: number
+    } | undefined
+    if (existing?.is_active) {
+      return { success: true, message: 'Licence déjà activée.' }
+    }
+
+    const hashedKey = hashKey(key.toUpperCase(), machineId)
+    const activatedAt = new Date().toISOString()
+    const checksum = generateIntegrityChecksum(hashedKey, machineId, activatedAt)
+
+    console.log('[License] Writing to database...')
+    try {
+      execute(
+        `INSERT OR REPLACE INTO licence (id, key, activated_at, machine_id, is_active, checksum)
+         VALUES (1, ?, ?, ?, 1, ?)`,
+        [hashedKey, activatedAt, machineId, checksum]
+      )
+    } catch (dbErr) {
+      // Self-heal: if checksum column is missing (old DB), add it and retry
+      if (String(dbErr).includes('no column named checksum')) {
+        console.log('[License] Adding missing checksum column...')
+        execute('ALTER TABLE licence ADD COLUMN checksum TEXT')
+        execute(
+          `INSERT OR REPLACE INTO licence (id, key, activated_at, machine_id, is_active, checksum)
+           VALUES (1, ?, ?, ?, 1, ?)`,
+          [hashedKey, activatedAt, machineId, checksum]
+        )
+      } else {
+        throw dbErr
+      }
+    }
+    console.log('[License] Saving to file...')
+    saveToFile()
+    console.log('[License] Activation successful!')
+    return { success: true, message: 'Licence activée avec succès!' }
+  } catch (err) {
+    console.error('[License] Activation failed:', err)
+    const message = err instanceof Error ? err.message : 'Erreur inconnue lors de l\'activation'
+    return { success: false, message }
   }
-
-  if (!validateLicenseKey(key)) {
-    return { success: false, message: 'Clé de licence invalide.' }
-  }
-
-  const machineId = getMachineId()
-
-  // Check if already activated
-  const existing = queryOne('SELECT * FROM licence WHERE id = 1') as {
-    key: string
-    is_active: number
-  } | undefined
-  if (existing?.is_active) {
-    return { success: true, message: 'Licence déjà activée.' }
-  }
-
-  const hashedKey = hashKey(key.toUpperCase(), machineId)
-  const activatedAt = new Date().toISOString()
-  const checksum = generateIntegrityChecksum(hashedKey, machineId, activatedAt)
-
-  execute(
-    `INSERT OR REPLACE INTO licence (id, key, activated_at, machine_id, is_active, checksum)
-     VALUES (1, ?, ?, ?, 1, ?)`,
-    [hashedKey, activatedAt, machineId, checksum]
-  )
-  saveToFile()
-  return { success: true, message: 'Licence activée avec succès!' }
 }
 
 /**
