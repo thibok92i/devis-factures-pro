@@ -1,6 +1,6 @@
 {
   "name": "devis-factures-pro",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Logiciel de gestion de devis et factures pour menuisier indépendant",
   "main": "./out/main/index.js",
   "author": "DevisPro",
