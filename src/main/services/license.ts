@@ -116,26 +116,29 @@ export function activateLicense(key: string): { success: boolean; message: strin
       return { success: true, message: 'Licence déjà activée.' }
     }
 
-    const hashedKey = hashKey(key.toUpperCase(), machineId)
+    const upperKey = key.toUpperCase()
+    const hashedKey = hashKey(upperKey, machineId)
+    const keyHint = upperKey.split('-').pop() || '' // Last group of original key
     const activatedAt = new Date().toISOString()
     const checksum = generateIntegrityChecksum(hashedKey, machineId, activatedAt)
 
     console.log('[License] Writing to database...')
     try {
       execute(
-        `INSERT OR REPLACE INTO licence (id, key, activated_at, machine_id, is_active, checksum)
-         VALUES (1, ?, ?, ?, 1, ?)`,
-        [hashedKey, activatedAt, machineId, checksum]
+        `INSERT OR REPLACE INTO licence (id, key, key_hint, activated_at, machine_id, is_active, checksum)
+         VALUES (1, ?, ?, ?, ?, 1, ?)`,
+        [hashedKey, keyHint, activatedAt, machineId, checksum]
       )
     } catch (dbErr) {
-      // Self-heal: if checksum column is missing (old DB), add it and retry
-      if (String(dbErr).includes('no column named checksum')) {
-        console.log('[License] Adding missing checksum column...')
-        execute('ALTER TABLE licence ADD COLUMN checksum TEXT')
+      // Self-heal: if columns are missing (old DB), add them and retry
+      if (String(dbErr).includes('no column named')) {
+        console.log('[License] Adding missing columns...')
+        try { execute('ALTER TABLE licence ADD COLUMN checksum TEXT') } catch { /* exists */ }
+        try { execute('ALTER TABLE licence ADD COLUMN key_hint TEXT') } catch { /* exists */ }
         execute(
-          `INSERT OR REPLACE INTO licence (id, key, activated_at, machine_id, is_active, checksum)
-           VALUES (1, ?, ?, ?, 1, ?)`,
-          [hashedKey, activatedAt, machineId, checksum]
+          `INSERT OR REPLACE INTO licence (id, key, key_hint, activated_at, machine_id, is_active, checksum)
+           VALUES (1, ?, ?, ?, ?, 1, ?)`,
+          [hashedKey, keyHint, activatedAt, machineId, checksum]
         )
       } else {
         throw dbErr
@@ -163,6 +166,7 @@ export function checkLicense(): { isActive: boolean; key?: string } {
   try {
     const row = queryOne('SELECT * FROM licence WHERE id = 1') as {
       key: string
+      key_hint: string | null
       machine_id: string
       is_active: number
       activated_at: string
@@ -195,7 +199,7 @@ export function checkLicense(): { isActive: boolean; key?: string } {
 
     return {
       isActive: true,
-      key: '****-****-****-' + (row.key as string).slice(-4)
+      key: row.key_hint ? '****-****-****-' + row.key_hint : 'Activée'
     }
   } catch {
     return { isActive: false }

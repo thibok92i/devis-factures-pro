@@ -290,7 +290,7 @@ export default function Dashboard() {
       <div className="mt-auto pt-8 flex items-center justify-center gap-3">
         <div className="wood-accent flex-1" />
         <p className="text-xs text-muted-foreground whitespace-nowrap">
-          Astuce : <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono">Ctrl+K</kbd> pour rechercher
+          Astuce : <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 text-xs font-mono">Ctrl+K</kbd> pour rechercher
         </p>
         <div className="wood-accent flex-1" />
       </div>

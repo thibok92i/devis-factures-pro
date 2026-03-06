@@ -173,6 +173,7 @@ export function createSchema(db: Database): void {
     CREATE TABLE IF NOT EXISTS licence (
       id INTEGER PRIMARY KEY CHECK(id = 1),
       key TEXT,
+      key_hint TEXT,
       activated_at TEXT,
       machine_id TEXT,
       is_active INTEGER NOT NULL DEFAULT 0,
@@ -197,6 +198,13 @@ export function createSchema(db: Database): void {
   // Migration: add checksum to licence table (for existing DBs created before v1.0.2)
   try {
     db.run(`ALTER TABLE licence ADD COLUMN checksum TEXT`)
+  } catch {
+    // Column already exists, ignore
+  }
+
+  // Migration: add key_hint to licence table (for displaying last 4 chars of original key)
+  try {
+    db.run(`ALTER TABLE licence ADD COLUMN key_hint TEXT`)
   } catch {
     // Column already exists, ignore
   }

@@ -45,7 +45,7 @@ export default function Sidebar() {
           >
             DevisPro
           </p>
-          <p className="text-[10px] mt-0.5" style={{ color: 'hsl(var(--sidebar-muted))' }}>
+          <p className="text-xs mt-0.5" style={{ color: 'hsl(var(--sidebar-muted))' }}>
             Menuiserie · Suisse romande
           </p>
         </div>
@@ -54,7 +54,7 @@ export default function Sidebar() {
       {/* Nav */}
       <nav className="flex-1 px-3 pt-4 pb-2 space-y-0.5">
         <p
-          className="px-3 pb-2 text-[9px] font-bold uppercase tracking-[0.15em]"
+          className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.15em]"
           style={{ color: 'hsl(var(--sidebar-muted))' }}
         >
           Navigation
@@ -112,7 +112,7 @@ export default function Sidebar() {
           <p className="text-xs font-semibold" style={{ color: 'hsl(35 30% 85%)' }}>
             Région d'Oron
           </p>
-          <p className="text-[10px] mt-0.5" style={{ color: 'hsl(var(--sidebar-muted))' }}>
+          <p className="text-xs mt-0.5" style={{ color: 'hsl(var(--sidebar-muted))' }}>
             Suisse romande · CHF · TVA 8.1%
           </p>
         </div>

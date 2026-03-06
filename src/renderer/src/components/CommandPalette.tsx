@@ -106,7 +106,7 @@ export default function CommandPalette() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
           />
-          <kbd className="hidden sm:inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground" style={{ borderColor: 'hsl(var(--border))', background: 'hsl(var(--muted))' }}>
+          <kbd className="hidden sm:inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-mono text-muted-foreground" style={{ borderColor: 'hsl(var(--border))', background: 'hsl(var(--muted))' }}>
             ESC
           </kbd>
         </div>
@@ -137,7 +137,7 @@ export default function CommandPalette() {
             )
           })}
         </div>
-        <div className="flex items-center gap-4 border-t px-4 py-2 text-[11px] text-muted-foreground" style={{ borderColor: 'hsl(var(--border))', background: 'hsl(var(--muted) / 0.5)' }}>
+        <div className="flex items-center gap-4 border-t px-4 py-2 text-xs text-muted-foreground" style={{ borderColor: 'hsl(var(--border))', background: 'hsl(var(--muted) / 0.5)' }}>
           <span>↑↓ naviguer</span>
           <span>↵ ouvrir</span>
           <span>esc fermer</span>
