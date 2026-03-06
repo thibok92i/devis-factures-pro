@@ -43,7 +43,9 @@ const api = {
       ipcRenderer.invoke('factures:saveLignes', factureId, lignes),
     updateStatut: (id: string, statut: string) =>
       ipcRenderer.invoke('factures:updateStatut', id, statut),
-    exportPdf: (id: string) => ipcRenderer.invoke('factures:exportPdf', id)
+    exportPdf: (id: string) => ipcRenderer.invoke('factures:exportPdf', id),
+    checkOverdue: () => ipcRenderer.invoke('factures:checkOverdue'),
+    overdue: () => ipcRenderer.invoke('factures:overdue')
   },
 
   // Catalogue

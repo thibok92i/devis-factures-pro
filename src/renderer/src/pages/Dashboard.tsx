@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Users, FileText, TrendingUp, Clock, Plus, ArrowRight, Package } from 'lucide-react'
+import { Users, FileText, TrendingUp, Clock, Plus, ArrowRight, Package, AlertTriangle } from 'lucide-react'
 import { formatCHF, clientDisplayName, devisStatutLabel, devisStatutColor, factureStatutLabel, factureStatutColor } from '../utils/format'
 import type { DashboardStats } from '../types'
 
@@ -78,12 +78,17 @@ export default function Dashboard() {
   const [recentDevis, setRecentDevis] = useState<any[]>([])
   const [recentFactures, setRecentFactures] = useState<any[]>([])
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([])
+  const [overdueFactures, setOverdueFactures] = useState<any[]>([])
   const navigate = useNavigate()
 
   useEffect(() => {
-    window.api.dashboard.stats().then(setStats)
+    // Auto-detect overdue invoices then load everything
+    window.api.factures.checkOverdue().then(() => {
+      window.api.factures.overdue().then((list: any[]) => setOverdueFactures(list || []))
+      window.api.dashboard.stats().then(setStats)
+      window.api.factures.list().then((list: any[]) => setRecentFactures((list || []).slice(0, 5)))
+    })
     window.api.devis.list().then((list: any[]) => setRecentDevis((list || []).slice(0, 5)))
-    window.api.factures.list().then((list: any[]) => setRecentFactures((list || []).slice(0, 5)))
     window.api.dashboard.monthlyRevenue().then((data: MonthlyData[]) => setMonthlyData(data || []))
   }, [])
 
@@ -124,6 +129,47 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {/* Overdue invoices alert */}
+      {overdueFactures.length > 0 && (
+        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-semibold text-destructive mb-2">
+                {overdueFactures.length} facture{overdueFactures.length > 1 ? 's' : ''} en retard de paiement
+              </h3>
+              <div className="space-y-1.5">
+                {overdueFactures.slice(0, 5).map((f: any) => {
+                  const days = Math.floor((Date.now() - new Date(f.echeance).getTime()) / 86400000)
+                  const clientName = f.client_entreprise || [f.client_prenom, f.client_nom].filter(Boolean).join(' ')
+                  return (
+                    <div
+                      key={f.id}
+                      className="flex items-center justify-between text-sm cursor-pointer hover:bg-destructive/10 -mx-2 px-2 py-1 rounded transition-colors"
+                      onClick={() => navigate(`/factures/${f.id}`)}
+                    >
+                      <span className="text-foreground">
+                        <span className="font-medium text-primary">{f.numero}</span>
+                        <span className="mx-2 text-muted-foreground">·</span>
+                        <span>{clientName}</span>
+                      </span>
+                      <span className="text-destructive font-medium shrink-0 ml-3">
+                        {formatCHF(f.total)} · {days}j de retard
+                      </span>
+                    </div>
+                  )
+                })}
+                {overdueFactures.length > 5 && (
+                  <button onClick={() => navigate('/factures')} className="text-xs text-destructive hover:underline mt-1">
+                    + {overdueFactures.length - 5} autre{overdueFactures.length - 5 > 1 ? 's' : ''}...
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats cards */}
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

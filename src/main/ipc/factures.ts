@@ -152,6 +152,32 @@ export function registerFactureHandlers(): void {
     }
   })
 
+  // Auto-detect and update overdue invoices
+  ipcMain.handle('factures:checkOverdue', () => {
+    const count = (queryOne(
+      `SELECT COUNT(*) as count FROM factures WHERE statut = 'envoyee' AND echeance < date('now')`
+    ) as { count: number }).count
+    if (count > 0) {
+      execute(
+        `UPDATE factures SET statut = 'en_retard', updated_at = datetime('now')
+         WHERE statut = 'envoyee' AND echeance < date('now')`
+      )
+      saveToFile()
+    }
+    return { updated: count }
+  })
+
+  // Get overdue invoices for alerts
+  ipcMain.handle('factures:overdue', () => {
+    return queryAll(
+      `SELECT f.id, f.numero, f.echeance, f.total,
+              c.nom as client_nom, c.prenom as client_prenom, c.entreprise as client_entreprise
+       FROM factures f LEFT JOIN clients c ON f.client_id = c.id
+       WHERE f.statut = 'en_retard'
+       ORDER BY f.echeance ASC`
+    )
+  })
+
   ipcMain.handle('factures:exportPdf', async (_event, id: string) => {
     const validId = requireUUID(id, 'ID facture')
     const facture = queryOne(
