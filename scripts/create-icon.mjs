@@ -2,7 +2,7 @@
  * Generate DevisPro app icon (256x256) as PNG and ICO.
  * Pure Node.js — no external dependencies.
  *
- * Design: Blue rounded square + white document with fold + text lines + total bar
+ * Design: Warm brown rounded square + white hammer icon (menuiserie/artisan)
  */
 
 import { writeFileSync, mkdirSync, existsSync } from 'fs'
@@ -61,62 +61,83 @@ function fillRoundedRect(x1, y1, x2, y2, rad, r, g, b, a) {
   }
 }
 
-// ---- Icon Design ----
-
-// Background: Blue rounded square (#2563eb)
-fillRoundedRect(10, 10, 245, 245, 48, 37, 99, 235, 255)
-
-// Subtle light gradient at top
-for (let y = 10; y < 128; y++) {
-  const alpha = Math.round((1 - y / 128) * 25)
-  fillRect(10, y, 245, y, 255, 255, 255, alpha)
-}
-
-// Document shape
-const dL = 68, dR = 188, dT = 40, dB = 216
-const fold = 30
-
-// Document body (white, skip fold corner)
-for (let y = dT; y <= dB; y++) {
-  for (let x = dL; x <= dR; x++) {
-    if (y < dT + fold && x > dR - fold) continue
-    setPixel(x, y, 255, 255, 255, 240)
-  }
-}
-
-// Fold triangle (slightly darker shade)
-for (let y = dT; y < dT + fold; y++) {
-  for (let x = dR - fold; x <= dR; x++) {
-    const relX = x - (dR - fold)
-    const relY = y - dT
-    if (relX + relY >= fold) {
-      setPixel(x, y, 195, 210, 240, 235)
+function fillCircle(cx, cy, r, cr, cg, cb, ca) {
+  for (let y = Math.floor(cy - r - 1); y <= Math.ceil(cy + r + 1); y++) {
+    for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) {
+      const d = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+      if (d <= r - 1) setPixel(x, y, cr, cg, cb, ca)
+      else if (d <= r + 0.5) setPixel(x, y, cr, cg, cb, Math.round(ca * Math.max(0, r + 0.5 - d) / 1.5))
     }
   }
 }
 
-// Fold diagonal line
-for (let i = 0; i <= fold; i++) {
-  setPixel(dR - fold + i, dT + i, 160, 180, 215, 200)
+/** Draw a filled rotated rectangle (for hammer parts) */
+function fillRotatedRect(cx, cy, w, h, angle, r, g, b, a) {
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  const maxR = Math.sqrt(w * w + h * h) / 2 + 2
+  for (let dy = -maxR; dy <= maxR; dy++) {
+    for (let dx = -maxR; dx <= maxR; dx++) {
+      // Rotate point back to rect-local coords
+      const lx = dx * cos + dy * sin
+      const ly = -dx * sin + dy * cos
+      if (lx >= -w / 2 && lx <= w / 2 && ly >= -h / 2 && ly <= h / 2) {
+        setPixel(cx + dx, cy + dy, r, g, b, a)
+      }
+    }
+  }
 }
 
-// "Title" line — bolder, blue
-fillRect(dL + 16, dT + 44, dL + 96, dT + 52, 37, 99, 235, 180)
+// ---- Icon Design ----
 
-// Text lines (gray)
-fillRect(dL + 16, dT + 66, dL + 88, dT + 71, 150, 165, 190, 140)
-fillRect(dL + 16, dT + 82, dL + 78, dT + 87, 150, 165, 190, 140)
-fillRect(dL + 16, dT + 98, dL + 84, dT + 103, 150, 165, 190, 140)
-fillRect(dL + 16, dT + 114, dL + 60, dT + 119, 150, 165, 190, 120)
+// Background: Warm brown/wood rounded square (matches app theme)
+// Primary color from app: hsl(35 65% 30%) ≈ #7D5C1F → richer brown
+const bgR = 101, bgG = 67, bgB = 33 // Deep warm brown (#654321)
+fillRoundedRect(10, 10, 245, 245, 48, bgR, bgG, bgB, 255)
 
-// Separator line
-fillRect(dL + 12, dB - 42, dR - 12, dB - 41, 37, 99, 235, 80)
+// Subtle warm gradient at top
+for (let y = 10; y < 140; y++) {
+  const alpha = Math.round((1 - y / 140) * 30)
+  fillRect(10, y, 245, y, 255, 200, 140, alpha)
+}
 
-// "Total" bar at bottom — blue accent
-fillRoundedRect(dR - 70, dB - 34, dR - 12, dB - 18, 4, 37, 99, 235, 160)
+// Subtle dark gradient at bottom
+for (let y = 180; y <= 245; y++) {
+  const alpha = Math.round(((y - 180) / 65) * 25)
+  fillRect(10, y, 245, y, 0, 0, 0, alpha)
+}
 
-// Small "amount" text in total bar
-fillRect(dR - 62, dB - 29, dR - 20, dB - 23, 255, 255, 255, 200)
+// ---- Hammer icon (white, centered) ----
+const angle = -Math.PI / 4 // 45 degrees tilted
+
+// Handle (long thin rect, tilted 45°)
+// Center of handle is offset down-right from center
+const handleCX = 148, handleCY = 148
+fillRotatedRect(handleCX, handleCY, 14, 120, angle, 255, 255, 255, 230)
+
+// Handle grip lines (subtle darker marks)
+for (let i = -3; i <= 3; i++) {
+  const ox = i * 6
+  const hx = handleCX + ox * Math.cos(angle) + ox * Math.sin(angle) * 0.3
+  const hy = handleCY + ox * Math.sin(angle) - ox * Math.cos(angle) * 0.3
+  fillRotatedRect(hx + 18, hy + 18, 12, 2, angle, bgR, bgG, bgB, 60)
+}
+
+// Hammer head (big thick rect on top of handle, tilted 45°)
+const headCX = 105, headCY = 105
+fillRotatedRect(headCX, headCY, 80, 30, angle, 255, 255, 255, 245)
+
+// Hammer head face (flat striking surface — slightly brighter)
+const faceOffX = -22 * Math.cos(angle + Math.PI / 2)
+const faceOffY = -22 * Math.sin(angle + Math.PI / 2)
+fillRotatedRect(headCX + faceOffX, headCY + faceOffY, 36, 8, angle + Math.PI / 2, 255, 255, 255, 255)
+
+// Small accent line on hammer head
+fillRotatedRect(headCX, headCY, 76, 3, angle, bgR, bgG, bgB, 40)
+
+// Connection circle (where handle meets head)
+fillCircle(128, 128, 10, 255, 255, 255, 250)
+fillCircle(128, 128, 5, bgR, bgG, bgB, 80)
 
 // ---- PNG Encoding ----
 

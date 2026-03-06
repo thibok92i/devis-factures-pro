@@ -34,7 +34,7 @@ export default function Dashboard() {
   const dayName = dayNames[today.getDay()]
 
   return (
-    <div>
+    <div className="flex flex-col min-h-[calc(100vh-7rem)]">
       {/* Header with greeting */}
       <div className="mb-8 flex items-center justify-between">
         <div>
@@ -108,9 +108,9 @@ export default function Dashboard() {
       </div>
 
       {/* Main content grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 flex-1">
         {/* Recent devis - takes 2 cols */}
-        <div className="lg:col-span-2 card">
+        <div className="lg:col-span-2 card flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-foreground">Derniers devis</h3>
             <button onClick={() => navigate('/devis')} className="text-sm text-primary hover:text-primary/80 flex items-center gap-1 transition-colors">
@@ -118,12 +118,14 @@ export default function Dashboard() {
             </button>
           </div>
           {recentDevis.length === 0 ? (
-            <div className="empty-state">
-              <FileText className="empty-state-icon" />
-              <p className="text-sm text-muted-foreground mb-3">Aucun devis</p>
-              <button onClick={() => navigate('/devis?action=new')} className="btn-primary text-sm">
-                <Plus className="h-3.5 w-3.5" /> Créer un devis
-              </button>
+            <div className="empty-state flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <FileText className="empty-state-icon" />
+                <p className="text-sm text-muted-foreground mb-3">Aucun devis</p>
+                <button onClick={() => navigate('/devis?action=new')} className="btn-primary text-sm">
+                  <Plus className="h-3.5 w-3.5" /> Créer un devis
+                </button>
+              </div>
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -209,7 +211,7 @@ export default function Dashboard() {
       </div>
 
       {/* Wood accent footer */}
-      <div className="mt-8 flex items-center justify-center gap-3">
+      <div className="mt-auto pt-8 flex items-center justify-center gap-3">
         <div className="wood-accent flex-1" />
         <p className="text-xs text-muted-foreground whitespace-nowrap">
           Astuce : <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono">Ctrl+K</kbd> pour rechercher

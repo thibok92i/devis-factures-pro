@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, session } from 'electron'
+import { app, BrowserWindow, shell, session, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDatabase, closeDb } from './database'
@@ -137,6 +137,9 @@ app.whenReady().then(async () => {
 
   // Start auto-backup
   startAutoBackup()
+
+  // Remove the default menu bar (File/Edit/View/Help in English)
+  Menu.setApplicationMenu(null)
 
   createWindow()
 
