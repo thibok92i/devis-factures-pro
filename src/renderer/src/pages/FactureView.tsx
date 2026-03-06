@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Download, CheckCircle, Send } from 'lucide-react'
 import { useToast } from '../components/Toast'
@@ -38,17 +38,20 @@ export default function FactureView() {
     }
   }
 
-  // --- Keyboard shortcuts ---
+  // --- Keyboard shortcuts (ref pattern to avoid re-attaching on every render) ---
+  const shortcutRef = useRef(handleExportPdf)
+  shortcutRef.current = handleExportPdf
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
         e.preventDefault()
-        handleExportPdf()
+        shortcutRef.current()
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  })
+  }, [])
 
   if (!facture) {
     return (

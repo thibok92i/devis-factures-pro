@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2, Save, Download, ArrowRight, Search, ChevronUp, ChevronDown, Check, Package, Calculator, X, Copy, GripVertical, Star, FileInput, RefreshCw, Layers } from 'lucide-react'
 import { useToast } from '../components/Toast'
@@ -366,16 +366,20 @@ export default function DevisEditor() {
     }
   }
 
-  // --- Keyboard shortcuts ---
+  // --- Keyboard shortcuts (ref pattern to avoid re-attaching on every render) ---
+  const shortcutRef = useRef({ handleSave, handleExportPdf, devis, navigate, toast })
+  shortcutRef.current = { handleSave, handleExportPdf, devis, navigate, toast }
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 's') {
+      const { handleSave, handleExportPdf, devis, navigate, toast } = shortcutRef.current
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault()
         handleSave()
-      } else if (e.ctrlKey && e.key === 'e') {
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
         e.preventDefault()
         handleExportPdf()
-      } else if (e.ctrlKey && e.key === 'd') {
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
         e.preventDefault()
         if (devis) {
           window.api.devis.duplicate(devis.id).then((result: { success: boolean; id: string }) => {
@@ -389,7 +393,7 @@ export default function DevisEditor() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  })
+  }, [])
 
   const filteredCatalogue = catalogue.filter((item) =>
     item.designation.toLowerCase().includes(catalogueSearch.toLowerCase()) ||
