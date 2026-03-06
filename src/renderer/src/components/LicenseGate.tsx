@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Key, AlertCircle, CheckCircle } from 'lucide-react'
+import { Key, AlertCircle, CheckCircle, Hammer } from 'lucide-react'
 
 interface LicenseGateProps {
   children: React.ReactNode
@@ -84,34 +84,11 @@ export default function LicenseGate({ children }: LicenseGateProps) {
           <div
             className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-4"
             style={{
-              background: 'linear-gradient(135deg, hsl(30 50% 30%), hsl(25 45% 22%))',
-              boxShadow: '0 4px 20px hsl(30 50% 20% / 0.3)'
+              background: 'linear-gradient(145deg, hsl(30 55% 32%), hsl(25 50% 20%))',
+              boxShadow: '0 6px 24px hsl(30 50% 15% / 0.4)'
             }}
           >
-            {/* Hammer icon SVG matching the app icon */}
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-              <rect
-                x="18"
-                y="14"
-                width="4"
-                height="22"
-                rx="2"
-                transform="rotate(-45 18 14)"
-                fill="white"
-                opacity="0.9"
-              />
-              <rect
-                x="6"
-                y="8"
-                width="22"
-                height="8"
-                rx="2"
-                transform="rotate(-45 6 8)"
-                fill="white"
-                opacity="0.95"
-              />
-              <circle cx="19" cy="19" r="3" fill="white" />
-            </svg>
+            <Hammer className="h-10 w-10 text-white" strokeWidth={1.8} />
           </div>
           <h1 className="text-2xl font-bold text-foreground">DevisPro</h1>
           <p className="text-sm text-muted-foreground mt-1">
