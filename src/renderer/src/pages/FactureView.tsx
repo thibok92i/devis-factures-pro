@@ -38,6 +38,18 @@ export default function FactureView() {
     }
   }
 
+  // --- Keyboard shortcuts ---
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+        e.preventDefault()
+        handleExportPdf()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  })
+
   if (!facture) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">

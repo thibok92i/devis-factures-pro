@@ -2,7 +2,7 @@ import { ipcMain, dialog } from 'electron'
 import { readFileSync, writeFileSync } from 'fs'
 import { queryAll, queryOne, execute, saveToFile } from '../database'
 import { activateLicense, checkLicense, deactivateLicense } from '../services/license'
-import { performBackup, getBackupPath } from '../services/backup'
+import { performBackup, getBackupPath, listBackups, restoreBackup } from '../services/backup'
 import {
   validateSettingsKey,
   validateSettingsValue,
@@ -79,6 +79,15 @@ export function registerSettingsHandlers(): void {
   })
 
   ipcMain.handle('backup:getPath', () => getBackupPath())
+
+  ipcMain.handle('backup:list', () => listBackups())
+
+  ipcMain.handle('backup:restore', (_event, fileName: string) => {
+    if (typeof fileName !== 'string' || !fileName) {
+      return { success: false, error: 'Nom de fichier requis' }
+    }
+    return restoreBackup(fileName)
+  })
 
   // ============================================================
   // Dashboard stats

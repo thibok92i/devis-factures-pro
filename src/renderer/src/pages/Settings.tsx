@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Save, Key, HardDrive, Building2, Landmark, ReceiptText, Clock, ImagePlus, Hash, Moon, Sun, FileText, Upload, X } from 'lucide-react'
+import { Save, Key, HardDrive, Building2, Landmark, ReceiptText, Clock, ImagePlus, Hash, Moon, Sun, FileText, Upload, X, RotateCcw } from 'lucide-react'
 import { useToast } from '../components/Toast'
 
 export default function Settings() {
@@ -10,6 +10,8 @@ export default function Settings() {
   const [licenseMessage, setLicenseMessage] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [backups, setBackups] = useState<{ name: string; date: string; size: number }[]>([])
+  const [showBackups, setShowBackups] = useState(false)
 
   useEffect(() => {
     window.api.settings.getAll().then(setSettings)
@@ -48,10 +50,40 @@ export default function Settings() {
       const result = await window.api.backup.run()
       if (result.success) {
         toast.success('Sauvegarde effectuée avec succès')
+        if (showBackups) loadBackups()
       }
     } catch {
       toast.error('Erreur lors de la sauvegarde')
     }
+  }
+
+  const loadBackups = async () => {
+    try {
+      const list = await window.api.backup.list()
+      setBackups(list || [])
+    } catch {
+      setBackups([])
+    }
+  }
+
+  const handleRestore = async (fileName: string) => {
+    if (!confirm(`Restaurer la sauvegarde "${fileName}" ?\n\nUne sauvegarde de la base actuelle sera créée avant la restauration. L'application va redémarrer.`)) return
+    try {
+      const result = await window.api.backup.restore(fileName)
+      if (result.success) {
+        toast.success('Sauvegarde restaurée ! Redémarrage...')
+        setTimeout(() => window.location.reload(), 1500)
+      } else {
+        toast.error(result.error || 'Erreur lors de la restauration')
+      }
+    } catch {
+      toast.error('Erreur lors de la restauration')
+    }
+  }
+
+  const toggleBackups = () => {
+    if (!showBackups) loadBackups()
+    setShowBackups(!showBackups)
   }
 
   const handleUploadLogo = async () => {
@@ -331,10 +363,38 @@ export default function Settings() {
         <p className="mb-3 text-sm text-muted-foreground">
           Les sauvegardes automatiques sont effectuées toutes les 30 minutes dans le dossier Documents/DevisPro/Sauvegardes.
         </p>
-        <button onClick={handleBackup} className="btn-secondary">
-          <HardDrive className="h-4 w-4" />
-          Sauvegarder maintenant
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handleBackup} className="btn-secondary">
+            <HardDrive className="h-4 w-4" />
+            Sauvegarder maintenant
+          </button>
+          <button onClick={toggleBackups} className="btn-secondary">
+            <RotateCcw className="h-4 w-4" />
+            {showBackups ? 'Masquer' : 'Restaurer'}
+          </button>
+        </div>
+        {showBackups && (
+          <div className="mt-4 border-t border-border pt-4">
+            <h3 className="text-sm font-medium text-foreground mb-2">Sauvegardes disponibles</h3>
+            {backups.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Aucune sauvegarde trouvée.</p>
+            ) : (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {backups.map((b) => (
+                  <div key={b.name} className="flex items-center justify-between rounded-lg border border-border p-2.5">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{new Date(b.date).toLocaleDateString('fr-CH', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                      <p className="text-xs text-muted-foreground">{(b.size / 1024).toFixed(0)} Ko</p>
+                    </div>
+                    <button onClick={() => handleRestore(b.name)} className="text-xs px-3 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                      Restaurer
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

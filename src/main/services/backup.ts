@@ -74,3 +74,43 @@ export function stopAutoBackup(): void {
 export function getBackupPath(): string {
   return getBackupDir()
 }
+
+export function listBackups(): { name: string; date: string; size: number }[] {
+  const backupDir = getBackupDir()
+  return readdirSync(backupDir)
+    .filter((f) => f.startsWith('devispro_') && f.endsWith('.db'))
+    .map((f) => {
+      const s = statSync(join(backupDir, f))
+      return {
+        name: f,
+        date: s.mtime.toISOString(),
+        size: s.size
+      }
+    })
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+}
+
+export function restoreBackup(fileName: string): { success: boolean; error?: string } {
+  try {
+    const backupDir = getBackupDir()
+    const backupPath = join(backupDir, fileName)
+
+    // Security: prevent path traversal
+    if (fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
+      return { success: false, error: 'Nom de fichier invalide' }
+    }
+
+    if (!existsSync(backupPath)) {
+      return { success: false, error: 'Fichier de sauvegarde introuvable' }
+    }
+
+    // Backup current DB before restoring
+    performBackup()
+
+    const dbPath = getDbPath()
+    copyFileSync(backupPath, dbPath)
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: String(err) }
+  }
+}

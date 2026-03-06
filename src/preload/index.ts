@@ -79,7 +79,9 @@ const api = {
   // Backup
   backup: {
     run: () => ipcRenderer.invoke('backup:run'),
-    getPath: () => ipcRenderer.invoke('backup:getPath')
+    getPath: () => ipcRenderer.invoke('backup:getPath'),
+    list: () => ipcRenderer.invoke('backup:list'),
+    restore: (fileName: string) => ipcRenderer.invoke('backup:restore', fileName)
   },
 
   // Forfaits

@@ -372,7 +372,7 @@ export default function DevisEditor() {
       if (e.ctrlKey && e.key === 's') {
         e.preventDefault()
         handleSave()
-      } else if (e.ctrlKey && e.key === 'p') {
+      } else if (e.ctrlKey && e.key === 'e') {
         e.preventDefault()
         handleExportPdf()
       } else if (e.ctrlKey && e.key === 'd') {
