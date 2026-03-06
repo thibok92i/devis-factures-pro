@@ -115,6 +115,15 @@ const api = {
     monthlyRevenue: () => ipcRenderer.invoke('dashboard:monthlyRevenue')
   },
 
+  // Rapports
+  rapport: {
+    caParMois: (annee: number) => ipcRenderer.invoke('rapport:caParMois', annee),
+    caParClient: (annee: number) => ipcRenderer.invoke('rapport:caParClient', annee),
+    topArticles: (annee: number) => ipcRenderer.invoke('rapport:topArticles', annee),
+    resume: (annee: number) => ipcRenderer.invoke('rapport:resume', annee),
+    anneesDisponibles: () => ipcRenderer.invoke('rapport:anneesDisponibles')
+  },
+
   // Export
   export: {
     facturesCsv: () => ipcRenderer.invoke('export:facturesCsv'),

@@ -5,6 +5,7 @@ import {
   FileText,
   Receipt,
   Package,
+  BarChart3,
   Settings,
   ChevronRight,
   Hammer
@@ -16,6 +17,7 @@ const navItems = [
   { to: '/devis', label: 'Devis', icon: FileText },
   { to: '/factures', label: 'Factures', icon: Receipt },
   { to: '/catalogue', label: 'Catalogue', icon: Package },
+  { to: '/rapports', label: 'Rapports', icon: BarChart3 },
 ]
 
 export default function Sidebar() {

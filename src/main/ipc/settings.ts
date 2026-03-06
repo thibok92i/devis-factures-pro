@@ -118,6 +118,109 @@ export function registerSettingsHandlers(): void {
   })
 
   // ============================================================
+  // Rapports annuels
+  // ============================================================
+
+  ipcMain.handle('rapport:caParMois', (_event, annee: number) => {
+    const y = Number(annee) || new Date().getFullYear()
+    // Generate all 12 months, fill with 0 if no data
+    const rows = queryAll(`
+      SELECT
+        strftime('%m', f.date) as mois,
+        COALESCE(SUM(CASE WHEN f.statut = 'payee' THEN f.total ELSE 0 END), 0) as encaisse,
+        COALESCE(SUM(f.total), 0) as facture,
+        COUNT(*) as nb_factures
+      FROM factures f
+      WHERE strftime('%Y', f.date) = ?
+      GROUP BY strftime('%m', f.date)
+      ORDER BY mois ASC
+    `, [String(y)]) as Array<{ mois: string; encaisse: number; facture: number; nb_factures: number }>
+
+    const result = []
+    for (let m = 1; m <= 12; m++) {
+      const key = String(m).padStart(2, '0')
+      const found = rows.find(r => r.mois === key)
+      result.push({
+        mois: `${y}-${key}`,
+        encaisse: found?.encaisse || 0,
+        facture: found?.facture || 0,
+        nb_factures: found?.nb_factures || 0
+      })
+    }
+    return result
+  })
+
+  ipcMain.handle('rapport:caParClient', (_event, annee: number) => {
+    const y = Number(annee) || new Date().getFullYear()
+    return queryAll(`
+      SELECT
+        c.id,
+        c.nom as client_nom,
+        c.prenom as client_prenom,
+        c.entreprise as client_entreprise,
+        COALESCE(SUM(CASE WHEN f.statut = 'payee' THEN f.total ELSE 0 END), 0) as encaisse,
+        COALESCE(SUM(f.total), 0) as total_facture,
+        COUNT(f.id) as nb_factures
+      FROM factures f
+      LEFT JOIN clients c ON f.client_id = c.id
+      WHERE strftime('%Y', f.date) = ?
+      GROUP BY f.client_id
+      ORDER BY encaisse DESC
+    `, [String(y)])
+  })
+
+  ipcMain.handle('rapport:topArticles', (_event, annee: number) => {
+    const y = Number(annee) || new Date().getFullYear()
+    return queryAll(`
+      SELECT
+        fl.designation,
+        fl.unite,
+        SUM(fl.quantite) as total_quantite,
+        AVG(fl.prix_unitaire) as prix_moyen,
+        SUM(fl.total) as total_ca,
+        COUNT(DISTINCT fl.facture_id) as nb_factures
+      FROM facture_lignes fl
+      JOIN factures f ON fl.facture_id = f.id
+      WHERE strftime('%Y', f.date) = ?
+        AND fl.description != '__SECTION__'
+      GROUP BY fl.designation, fl.unite
+      ORDER BY total_ca DESC
+      LIMIT 20
+    `, [String(y)])
+  })
+
+  ipcMain.handle('rapport:resume', (_event, annee: number) => {
+    const y = Number(annee) || new Date().getFullYear()
+    const ca = (queryOne(`SELECT COALESCE(SUM(total), 0) as total FROM factures WHERE statut = 'payee' AND strftime('%Y', date) = ?`, [String(y)]) as { total: number }).total
+    const totalFacture = (queryOne(`SELECT COALESCE(SUM(total), 0) as total FROM factures WHERE strftime('%Y', date) = ?`, [String(y)]) as { total: number }).total
+    const nbFactures = (queryOne(`SELECT COUNT(*) as count FROM factures WHERE strftime('%Y', date) = ?`, [String(y)]) as { count: number }).count
+    const nbDevis = (queryOne(`SELECT COUNT(*) as count FROM devis WHERE strftime('%Y', date) = ?`, [String(y)]) as { count: number }).count
+    const nbClients = (queryOne(`SELECT COUNT(DISTINCT client_id) as count FROM factures WHERE strftime('%Y', date) = ?`, [String(y)]) as { count: number }).count
+    const enAttente = (queryOne(`SELECT COALESCE(SUM(total), 0) as total FROM factures WHERE statut IN ('envoyee', 'en_retard') AND strftime('%Y', date) = ?`, [String(y)]) as { total: number }).total
+    const tauxConversion = nbDevis > 0
+      ? (queryOne(`SELECT COUNT(*) as count FROM devis WHERE statut = 'accepte' AND strftime('%Y', date) = ?`, [String(y)]) as { count: number }).count / nbDevis * 100
+      : 0
+
+    // Previous year for comparison
+    const yPrev = String(y - 1)
+    const caPrev = (queryOne(`SELECT COALESCE(SUM(total), 0) as total FROM factures WHERE statut = 'payee' AND strftime('%Y', date) = ?`, [yPrev]) as { total: number }).total
+
+    return { ca, totalFacture, nbFactures, nbDevis, nbClients, enAttente, tauxConversion: Math.round(tauxConversion), caPrev }
+  })
+
+  ipcMain.handle('rapport:anneesDisponibles', () => {
+    const rows = queryAll(`
+      SELECT DISTINCT strftime('%Y', date) as annee FROM factures
+      UNION
+      SELECT DISTINCT strftime('%Y', date) as annee FROM devis
+      ORDER BY annee DESC
+    `) as Array<{ annee: string }>
+    const annees = rows.map(r => parseInt(r.annee)).filter(a => !isNaN(a))
+    if (annees.length === 0) annees.push(new Date().getFullYear())
+    return annees
+  })
+
+  // ============================================================
   // Logo upload (file dialog → base64 → settings)
   // ============================================================
 
