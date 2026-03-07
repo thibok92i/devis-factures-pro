@@ -11,6 +11,8 @@ import {
   validateLignes,
   optionalDate,
   optionalString,
+  requireNumber,
+  requireEnum,
   ValidationError
 } from '../security/validators'
 
@@ -29,7 +31,8 @@ export function registerFactureHandlers(): void {
               c.telephone as client_telephone, c.email as client_email
        FROM factures f LEFT JOIN clients c ON f.client_id = c.id WHERE f.id = ?`, [validId])
     const lignes = queryAll('SELECT * FROM facture_lignes WHERE facture_id = ? ORDER BY ordre', [validId])
-    return { ...facture, lignes }
+    const paiements = queryAll('SELECT * FROM paiements WHERE facture_id = ? ORDER BY date DESC', [validId])
+    return { ...facture, lignes, paiements }
   })
 
   ipcMain.handle('factures:createFromDevis', (_event, devisId: string) => {
@@ -112,6 +115,7 @@ export function registerFactureHandlers(): void {
   ipcMain.handle('factures:delete', (_event, id: string) => {
     try {
       const validId = requireUUID(id, 'ID facture')
+      execute('DELETE FROM paiements WHERE facture_id = ?', [validId])
       execute('DELETE FROM facture_lignes WHERE facture_id = ?', [validId])
       execute('DELETE FROM factures WHERE id = ?', [validId])
       saveToFile()
@@ -176,6 +180,163 @@ export function registerFactureHandlers(): void {
        WHERE f.statut = 'en_retard'
        ORDER BY f.echeance ASC`
     )
+  })
+
+  // --- Paiements (partial payments / acomptes) ---
+
+  ipcMain.handle('paiements:list', (_event, factureId: string) => {
+    const validId = requireUUID(factureId, 'ID facture')
+    return queryAll('SELECT * FROM paiements WHERE facture_id = ? ORDER BY date DESC', [validId])
+  })
+
+  ipcMain.handle('paiements:add', (_event, data: Record<string, unknown>) => {
+    try {
+      const factureId = requireUUID(data.facture_id, 'ID facture')
+      const montant = requireNumber(data.montant, 'Montant', 0.01, 9999999)
+      const date = optionalDate(data.date, 'Date') || new Date().toISOString().slice(0, 10)
+      const methode = requireEnum(data.methode as string, 'Méthode', ['virement', 'especes', 'carte', 'cheque', 'autre'])
+      const notes = optionalString(data.notes, 'Notes', 500)
+
+      const id = uuid()
+      execute(
+        `INSERT INTO paiements (id, facture_id, montant, date, methode, notes) VALUES (?, ?, ?, ?, ?, ?)`,
+        [id, factureId, montant, date, methode, notes]
+      )
+      // Update montant_paye on facture
+      const totalPaye = (queryOne('SELECT COALESCE(SUM(montant), 0) as total FROM paiements WHERE facture_id = ?', [factureId]) as { total: number }).total
+      execute("UPDATE factures SET montant_paye = ?, updated_at = datetime('now') WHERE id = ?", [totalPaye, factureId])
+      // Auto-mark as payee if fully paid
+      const facture = queryOne('SELECT total FROM factures WHERE id = ?', [factureId]) as { total: number }
+      if (totalPaye >= facture.total) {
+        execute("UPDATE factures SET statut = 'payee', date_paiement = ?, updated_at = datetime('now') WHERE id = ?", [date, factureId])
+      }
+      saveToFile()
+      return { success: true, id, montant_paye: totalPaye }
+    } catch (err) {
+      if (err instanceof ValidationError) return { success: false, error: err.message }
+      throw err
+    }
+  })
+
+  ipcMain.handle('paiements:delete', (_event, id: string) => {
+    try {
+      const validId = requireUUID(id, 'ID paiement')
+      const paiement = queryOne('SELECT facture_id FROM paiements WHERE id = ?', [validId]) as { facture_id: string } | undefined
+      if (!paiement) return { success: false, error: 'Paiement introuvable' }
+
+      execute('DELETE FROM paiements WHERE id = ?', [validId])
+      // Recalculate montant_paye
+      const totalPaye = (queryOne('SELECT COALESCE(SUM(montant), 0) as total FROM paiements WHERE facture_id = ?', [paiement.facture_id]) as { total: number }).total
+      execute("UPDATE factures SET montant_paye = ?, updated_at = datetime('now') WHERE id = ?", [totalPaye, paiement.facture_id])
+      saveToFile()
+      return { success: true, montant_paye: totalPaye }
+    } catch (err) {
+      if (err instanceof ValidationError) return { success: false, error: err.message }
+      throw err
+    }
+  })
+
+  // --- Lettre de relance (payment reminder) ---
+  ipcMain.handle('factures:exportRelance', async (_event, id: string) => {
+    const validId = requireUUID(id, 'ID facture')
+    const facture = queryOne(
+      `SELECT f.*, c.nom as client_nom, c.prenom as client_prenom,
+              c.entreprise as client_entreprise, c.adresse as client_adresse,
+              c.npa as client_npa, c.ville as client_ville
+       FROM factures f LEFT JOIN clients c ON f.client_id = c.id WHERE f.id = ?`, [validId]) as Record<string, unknown>
+    if (!facture) return { success: false, error: 'Facture introuvable' }
+
+    const settingsRows = queryAll('SELECT key, value FROM settings') as Array<{ key: string; value: string }>
+    const settings = Object.fromEntries(settingsRows.map((r) => [r.key, r.value]))
+
+    const paye = Number(facture.montant_paye) || 0
+    const total = Number(facture.total) || 0
+    const reste = total - paye
+    const today = new Date().toLocaleDateString('fr-CH', { day: '2-digit', month: 'long', year: 'numeric' })
+    const echeanceDate = new Date(String(facture.echeance)).toLocaleDateString('fr-CH', { day: '2-digit', month: 'long', year: 'numeric' })
+    const clientName = facture.client_entreprise
+      ? String(facture.client_entreprise)
+      : [facture.client_prenom, facture.client_nom].filter(Boolean).join(' ')
+
+    const formatMontant = (n: number) => `CHF ${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, "'")}`
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 11pt; color: #1a1a1a; margin: 50px 60px; line-height: 1.6; }
+  .header { display: flex; justify-content: space-between; margin-bottom: 40px; }
+  .company { font-size: 10pt; color: #555; }
+  .company strong { color: #1a1a1a; font-size: 12pt; }
+  .recipient { margin-bottom: 30px; }
+  .recipient p { margin: 2px 0; }
+  .date { text-align: right; margin-bottom: 30px; color: #555; }
+  h1 { font-size: 16pt; color: #c0392b; margin-bottom: 20px; border-bottom: 2px solid #c0392b; padding-bottom: 8px; }
+  .ref-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+  .ref-table td { padding: 6px 12px; font-size: 10pt; }
+  .ref-table tr:nth-child(odd) { background: #f8f8f8; }
+  .ref-table .label { color: #555; width: 200px; }
+  .ref-table .value { font-weight: 600; }
+  .amount { font-size: 14pt; font-weight: 700; color: #c0392b; }
+  .body-text { margin: 25px 0; }
+  .closing { margin-top: 40px; }
+  .footer { margin-top: 60px; font-size: 9pt; color: #888; border-top: 1px solid #ddd; padding-top: 10px; }
+</style></head><body>
+<div class="header">
+  <div class="company">
+    <strong>${settings.entreprise_nom || 'DevisPro'}</strong><br>
+    ${settings.entreprise_adresse || ''}<br>
+    ${settings.entreprise_npa || ''} ${settings.entreprise_ville || ''}<br>
+    ${settings.entreprise_telephone ? 'Tél: ' + settings.entreprise_telephone : ''}
+    ${settings.entreprise_email ? '<br>' + settings.entreprise_email : ''}
+  </div>
+</div>
+
+<div class="recipient">
+  ${facture.client_entreprise ? '<p><strong>' + facture.client_entreprise + '</strong></p>' : ''}
+  <p>${[facture.client_prenom, facture.client_nom].filter(Boolean).join(' ')}</p>
+  <p>${facture.client_adresse || ''}</p>
+  <p>${facture.client_npa || ''} ${facture.client_ville || ''}</p>
+</div>
+
+<div class="date">${settings.entreprise_ville || ''}, le ${today}</div>
+
+<h1>Rappel de paiement</h1>
+
+<div class="body-text">
+  <p>Madame, Monsieur,</p>
+  <p>Sauf erreur de notre part, nous constatons que la facture ci-dessous demeure impayée à ce jour :</p>
+</div>
+
+<table class="ref-table">
+  <tr><td class="label">N° de facture</td><td class="value">${facture.numero}</td></tr>
+  <tr><td class="label">Date de la facture</td><td class="value">${new Date(String(facture.date)).toLocaleDateString('fr-CH', { day: '2-digit', month: 'long', year: 'numeric' })}</td></tr>
+  <tr><td class="label">Échéance</td><td class="value">${echeanceDate}</td></tr>
+  <tr><td class="label">Montant total</td><td class="value">${formatMontant(total)}</td></tr>
+  ${paye > 0 ? `<tr><td class="label">Déjà payé</td><td class="value">${formatMontant(paye)}</td></tr>` : ''}
+  <tr><td class="label">Solde restant dû</td><td class="value amount">${formatMontant(reste)}</td></tr>
+</table>
+
+<div class="body-text">
+  <p>Nous vous prions de bien vouloir procéder au règlement de ce montant dans les <strong>10 jours</strong> suivant la réception de ce courrier.</p>
+  ${settings.entreprise_iban ? `<p>Coordonnées bancaires :<br><strong>IBAN : ${settings.entreprise_iban}</strong>${settings.entreprise_banque ? '<br>' + settings.entreprise_banque : ''}</p>` : ''}
+  <p>Si le paiement a été effectué entre-temps, nous vous prions de considérer ce rappel comme sans objet.</p>
+</div>
+
+<div class="closing">
+  <p>Avec nos meilleures salutations,</p>
+  <p><strong>${settings.entreprise_nom || ''}</strong></p>
+</div>
+
+<div class="footer">${settings.entreprise_nom || ''} · ${settings.entreprise_adresse || ''} · ${settings.entreprise_npa || ''} ${settings.entreprise_ville || ''}</div>
+</body></html>`
+
+    const defaultPath = getDefaultExportPath('facture', `Relance_${facture.numero}`)
+    const { filePath } = await dialog.showSaveDialog({ defaultPath, filters: [{ name: 'PDF', extensions: ['pdf'] }] })
+    if (!filePath) return { success: false, message: 'Export annulé' }
+    const dir = dirname(filePath)
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    await generatePdf(html, filePath)
+    shell.openPath(filePath)
+    return { success: true, path: filePath }
   })
 
   ipcMain.handle('factures:exportPdf', async (_event, id: string) => {

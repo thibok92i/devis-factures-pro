@@ -61,8 +61,8 @@ export default function DevisList() {
 
   const handleCreate = async () => {
     if (!selectedClient) return
-    const result = await execute(() => window.api.devis.create({ client_id: selectedClient }))
-    if (result) {
+    try {
+      const result = await execute(() => window.api.devis.create({ client_id: selectedClient }))
       // If a template is selected, load its lines
       if (selectedTemplate) {
         try {
@@ -84,12 +84,18 @@ export default function DevisList() {
       setShowNewModal(false)
       navigate(`/devis/${result.id}`)
       toast.success('Devis créé')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de la création')
     }
   }
 
   const handleInlineClientCreate = async (data: Partial<Record<string, unknown>>) => {
     try {
       const result = await window.api.clients.create(data)
+      if (result && typeof result === 'object' && 'success' in result && !result.success) {
+        toast.error(String(result.error || 'Erreur de validation'))
+        return
+      }
       if (result && result.id) {
         await refreshClients()
         setSelectedClient(result.id)
@@ -103,34 +109,46 @@ export default function DevisList() {
 
   const handleDelete = async (id: string) => {
     if (confirm('Supprimer ce devis ?')) {
-      await execute(() => window.api.devis.delete(id))
-      toast.success('Devis supprimé')
-      refresh()
+      try {
+        await execute(() => window.api.devis.delete(id))
+        toast.success('Devis supprimé')
+        refresh()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Erreur lors de la suppression')
+      }
     }
   }
 
   const handleConvertToFacture = async (devisId: string) => {
     if (confirm('Convertir ce devis en facture ?')) {
-      const result = await execute(() => window.api.factures.createFromDevis(devisId))
-      if (result) {
+      try {
+        const result = await execute(() => window.api.factures.createFromDevis(devisId))
         toast.success('Facture créée avec succès')
         refresh()
         navigate(`/factures/${result.id}`)
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Erreur lors de la conversion')
       }
     }
   }
 
   const handleExportPdf = async (id: string) => {
-    await execute(() => window.api.devis.exportPdf(id))
-    toast.success('PDF exporté')
+    try {
+      await execute(() => window.api.devis.exportPdf(id))
+      toast.success('PDF exporté')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de l\'export')
+    }
   }
 
   const handleDuplicate = async (id: string) => {
-    const result = await execute(() => window.api.devis.duplicate(id))
-    if (result) {
+    try {
+      const result = await execute(() => window.api.devis.duplicate(id))
       toast.success('Devis dupliqué')
       refresh()
       navigate(`/devis/${result.id}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de la duplication')
     }
   }
 

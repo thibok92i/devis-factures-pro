@@ -1,6 +1,8 @@
-import { ipcMain, dialog } from 'electron'
-import { readFileSync, writeFileSync } from 'fs'
+import { ipcMain, dialog, shell } from 'electron'
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { dirname } from 'path'
 import { queryAll, queryOne, execute, saveToFile } from '../database'
+import { generatePdf, getDefaultExportPath } from '../services/pdf'
 import { activateLicense, checkLicense, deactivateLicense } from '../services/license'
 import { performBackup, getBackupPath, listBackups, restoreBackup } from '../services/backup'
 import {
@@ -55,12 +57,14 @@ export function registerSettingsHandlers(): void {
     }
   })
 
-  ipcMain.handle('license:check', () => checkLicense())
+  ipcMain.handle('license:check', async () => {
+    return await checkLicense()
+  })
 
-  ipcMain.handle('license:activate', (_event, key: string) => {
+  ipcMain.handle('license:activate', async (_event, key: string) => {
     try {
       const validKey = requireString(key, 'Clé de licence', 19)
-      return activateLicense(validKey)
+      return await activateLicense(validKey)
     } catch (err) {
       console.error('[License] Activation error:', err)
       const message = err instanceof Error ? err.message : 'Erreur inconnue'
@@ -68,8 +72,8 @@ export function registerSettingsHandlers(): void {
     }
   })
 
-  ipcMain.handle('license:deactivate', () => {
-    deactivateLicense()
+  ipcMain.handle('license:deactivate', async () => {
+    await deactivateLicense()
     return { success: true }
   })
 
@@ -221,6 +225,145 @@ export function registerSettingsHandlers(): void {
   })
 
   // ============================================================
+  // Export rapport annuel PDF
+  // ============================================================
+
+  ipcMain.handle('rapport:exportPdf', async (_event, annee: number) => {
+    const y = Number(annee) || new Date().getFullYear()
+
+    // Gather all data
+    const settingsRows = queryAll('SELECT key, value FROM settings') as Array<{ key: string; value: string }>
+    const settings = Object.fromEntries(settingsRows.map((r) => [r.key, r.value]))
+
+    const ca = (queryOne(`SELECT COALESCE(SUM(total), 0) as total FROM factures WHERE statut = 'payee' AND strftime('%Y', date) = ?`, [String(y)]) as { total: number }).total
+    const totalFacture = (queryOne(`SELECT COALESCE(SUM(total), 0) as total FROM factures WHERE strftime('%Y', date) = ?`, [String(y)]) as { total: number }).total
+    const nbFactures = (queryOne(`SELECT COUNT(*) as count FROM factures WHERE strftime('%Y', date) = ?`, [String(y)]) as { count: number }).count
+    const nbClients = (queryOne(`SELECT COUNT(DISTINCT client_id) as count FROM factures WHERE strftime('%Y', date) = ?`, [String(y)]) as { count: number }).count
+    const enAttente = (queryOne(`SELECT COALESCE(SUM(total), 0) as total FROM factures WHERE statut IN ('envoyee', 'en_retard') AND strftime('%Y', date) = ?`, [String(y)]) as { total: number }).total
+
+    const moisData = queryAll(`
+      SELECT
+        strftime('%m', f.date) as mois,
+        COALESCE(SUM(CASE WHEN f.statut = 'payee' THEN f.total ELSE 0 END), 0) as encaisse,
+        COALESCE(SUM(f.total), 0) as facture,
+        COUNT(*) as nb_factures
+      FROM factures f WHERE strftime('%Y', f.date) = ?
+      GROUP BY strftime('%m', f.date) ORDER BY mois ASC
+    `, [String(y)]) as Array<{ mois: string; encaisse: number; facture: number; nb_factures: number }>
+
+    const clientData = queryAll(`
+      SELECT c.nom as client_nom, c.prenom as client_prenom, c.entreprise as client_entreprise,
+             COALESCE(SUM(CASE WHEN f.statut = 'payee' THEN f.total ELSE 0 END), 0) as encaisse,
+             COALESCE(SUM(f.total), 0) as total_facture, COUNT(f.id) as nb_factures
+      FROM factures f LEFT JOIN clients c ON f.client_id = c.id
+      WHERE strftime('%Y', f.date) = ? GROUP BY f.client_id ORDER BY encaisse DESC LIMIT 10
+    `, [String(y)]) as Array<Record<string, unknown>>
+
+    const articleData = queryAll(`
+      SELECT fl.designation, fl.unite, SUM(fl.quantite) as total_quantite,
+             AVG(fl.prix_unitaire) as prix_moyen, SUM(fl.total) as total_ca,
+             COUNT(DISTINCT fl.facture_id) as nb_factures
+      FROM facture_lignes fl JOIN factures f ON fl.facture_id = f.id
+      WHERE strftime('%Y', f.date) = ? AND fl.description != '__SECTION__'
+      GROUP BY fl.designation, fl.unite ORDER BY total_ca DESC LIMIT 15
+    `, [String(y)]) as Array<Record<string, unknown>>
+
+    const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
+
+    const fmtCHF = (n: number) => new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF', minimumFractionDigits: 2 }).format(n)
+
+    // Build monthly table
+    let moisRows = ''
+    for (let m = 1; m <= 12; m++) {
+      const key = String(m).padStart(2, '0')
+      const found = moisData.find(r => r.mois === key)
+      const enc = found?.encaisse || 0
+      const fact = found?.facture || 0
+      const nb = found?.nb_factures || 0
+      moisRows += `<tr><td>${monthNames[m - 1]}</td><td style="text-align:right">${nb}</td><td style="text-align:right">${fmtCHF(fact)}</td><td style="text-align:right">${fmtCHF(enc)}</td></tr>`
+    }
+
+    // Build client table
+    let clientRows = ''
+    for (const c of clientData) {
+      const name = c.client_entreprise || [c.client_prenom, c.client_nom].filter(Boolean).join(' ')
+      clientRows += `<tr><td>${name}</td><td style="text-align:right">${c.nb_factures}</td><td style="text-align:right">${fmtCHF(c.total_facture as number)}</td><td style="text-align:right">${fmtCHF(c.encaisse as number)}</td></tr>`
+    }
+
+    // Build articles table
+    let articleRows = ''
+    for (const a of articleData) {
+      articleRows += `<tr><td>${a.designation}</td><td style="text-align:center">${a.unite}</td><td style="text-align:right">${Math.round(a.total_quantite as number * 100) / 100}</td><td style="text-align:right">${fmtCHF(a.prix_moyen as number)}</td><td style="text-align:right">${fmtCHF(a.total_ca as number)}</td></tr>`
+    }
+
+    const entreprise = settings.entreprise_nom || 'Mon Entreprise'
+
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; color: #1a1a1a; padding: 30px 40px; }
+  h1 { font-size: 22px; color: #0f4c3a; margin-bottom: 4px; }
+  h2 { font-size: 14px; color: #0f4c3a; margin-top: 28px; margin-bottom: 10px; border-bottom: 2px solid #0f4c3a; padding-bottom: 4px; }
+  .subtitle { color: #666; font-size: 12px; margin-bottom: 20px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+  .kpi { background: #f8f9fa; border-radius: 8px; padding: 14px; }
+  .kpi-label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi-value { font-size: 18px; font-weight: 700; color: #1a1a1a; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  th { background: #f0f0f0; padding: 6px 10px; text-align: left; font-size: 10px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd; }
+  td { padding: 5px 10px; border-bottom: 1px solid #eee; font-size: 10px; }
+  tr:nth-child(even) { background: #fafafa; }
+  .footer { margin-top: 30px; text-align: center; font-size: 9px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
+</style></head><body>
+  <h1>Rapport annuel ${y}</h1>
+  <p class="subtitle">${entreprise} — Généré le ${new Date().toLocaleDateString('fr-CH')}</p>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">CA encaissé</div><div class="kpi-value">${fmtCHF(ca)}</div></div>
+    <div class="kpi"><div class="kpi-label">Total facturé</div><div class="kpi-value">${fmtCHF(totalFacture)}</div></div>
+    <div class="kpi"><div class="kpi-label">Clients actifs</div><div class="kpi-value">${nbClients}</div></div>
+    <div class="kpi"><div class="kpi-label">En attente</div><div class="kpi-value">${fmtCHF(enAttente)}</div></div>
+  </div>
+
+  <h2>Chiffre d'affaires par mois</h2>
+  <table>
+    <thead><tr><th>Mois</th><th style="text-align:right">Factures</th><th style="text-align:right">Facturé</th><th style="text-align:right">Encaissé</th></tr></thead>
+    <tbody>${moisRows}
+      <tr style="font-weight:bold; border-top:2px solid #0f4c3a">
+        <td>Total</td><td style="text-align:right">${nbFactures}</td><td style="text-align:right">${fmtCHF(totalFacture)}</td><td style="text-align:right">${fmtCHF(ca)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Top clients</h2>
+  <table>
+    <thead><tr><th>Client</th><th style="text-align:right">Factures</th><th style="text-align:right">Facturé</th><th style="text-align:right">Encaissé</th></tr></thead>
+    <tbody>${clientRows}</tbody>
+  </table>
+
+  <h2>Top articles / prestations</h2>
+  <table>
+    <thead><tr><th>Désignation</th><th style="text-align:center">Unité</th><th style="text-align:right">Quantité</th><th style="text-align:right">Prix moy.</th><th style="text-align:right">CA total</th></tr></thead>
+    <tbody>${articleRows}</tbody>
+  </table>
+
+  <div class="footer">Rapport généré automatiquement par DevisPro — ${entreprise}</div>
+</body></html>`
+
+    const defaultPath = getDefaultExportPath('rapport', String(y))
+    const { filePath } = await dialog.showSaveDialog({
+      defaultPath,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    })
+    if (!filePath) return { success: false, message: 'Export annulé' }
+    const dir = dirname(filePath)
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    await generatePdf(html, filePath)
+    shell.openPath(filePath)
+    return { success: true, path: filePath }
+  })
+
+  // ============================================================
   // Logo upload (file dialog → base64 → settings)
   // ============================================================
 
@@ -344,5 +487,41 @@ export function registerSettingsHandlers(): void {
 
     saveToFile()
     return { success: true, count: imported }
+  })
+
+  // ============================================================
+  // Export catalogue CSV
+  // ============================================================
+
+  ipcMain.handle('catalogue:exportCsv', async () => {
+    const items = queryAll(`
+      SELECT reference, designation, type, unite, prix_unitaire, categorie
+      FROM catalogue ORDER BY categorie, designation
+    `) as Record<string, unknown>[]
+
+    if (items.length === 0) return { success: false, error: 'Catalogue vide' }
+
+    const headers = ['Reference', 'Designation', 'Type', 'Unite', 'Prix unitaire', 'Categorie']
+    const csvRows = [headers.join(';')]
+    for (const item of items) {
+      const row = [
+        item.reference || '',
+        item.designation || '',
+        item.type || '',
+        item.unite || '',
+        (item.prix_unitaire as number).toFixed(2),
+        item.categorie || ''
+      ]
+      csvRows.push(row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';'))
+    }
+
+    const csv = '\uFEFF' + csvRows.join('\n')
+    const { filePath } = await dialog.showSaveDialog({
+      defaultPath: `catalogue-${new Date().toISOString().slice(0, 10)}.csv`,
+      filters: [{ name: 'CSV', extensions: ['csv'] }]
+    })
+    if (!filePath) return { success: false, message: 'Export annule' }
+    writeFileSync(filePath, csv, 'utf-8')
+    return { success: true, path: filePath, count: items.length }
   })
 }

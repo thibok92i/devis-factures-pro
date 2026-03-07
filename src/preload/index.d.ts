@@ -19,6 +19,7 @@ interface DevisAPI {
   updateRemise(devisId: string, remisePourcent: number): Promise<{ success: boolean }>
   updateStatut(id: string, statut: string): Promise<{ success: boolean }>
   exportPdf(id: string): Promise<{ success: boolean; path?: string; message?: string }>
+  duplicate(id: string): Promise<{ success: boolean; id: string; numero?: string }>
 }
 
 interface FactureAPI {
@@ -30,6 +31,15 @@ interface FactureAPI {
   saveLignes(factureId: string, lignes: Partial<FactureLigne>[]): Promise<{ success: boolean }>
   updateStatut(id: string, statut: string): Promise<{ success: boolean }>
   exportPdf(id: string): Promise<{ success: boolean; path?: string; message?: string }>
+  exportRelance(id: string): Promise<{ success: boolean; path?: string; message?: string; error?: string }>
+  checkOverdue(): Promise<{ count: number }>
+  overdue(): Promise<unknown[]>
+}
+
+interface PaiementsAPI {
+  list(factureId: string): Promise<Paiement[]>
+  add(data: Record<string, unknown>): Promise<{ success: boolean; id?: string; montant_paye?: number; error?: string }>
+  delete(id: string): Promise<{ success: boolean; montant_paye?: number; error?: string }>
 }
 
 interface CatalogueAPI {
@@ -40,6 +50,7 @@ interface CatalogueAPI {
   delete(id: string): Promise<{ success: boolean }>
   search(query: string): Promise<CatalogueItem[]>
   categories(): Promise<string[]>
+  toggleFavorite(id: string): Promise<{ success: boolean }>
 }
 
 interface SettingsAPI {
@@ -50,7 +61,13 @@ interface SettingsAPI {
 }
 
 interface LicenseAPI {
-  check(): Promise<{ isActive: boolean; key?: string }>
+  check(): Promise<{
+    isActive: boolean
+    key?: string
+    daysRemaining?: number
+    offlineExpired?: boolean
+    needsReactivation?: boolean
+  }>
   activate(key: string): Promise<{ success: boolean; message: string }>
   deactivate(): Promise<{ success: boolean }>
 }
@@ -62,17 +79,64 @@ interface BackupAPI {
 
 interface DashboardAPI {
   stats(): Promise<DashboardStats>
+  monthlyRevenue(): Promise<unknown[]>
+}
+
+interface ForfaitsAPI {
+  list(): Promise<Forfait[]>
+  get(id: string): Promise<ForfaitDetail | null>
+  calculate(id: string, quantite: number): Promise<Record<string, unknown>>
+  create(data: Record<string, unknown>): Promise<{ success: boolean; id?: string }>
+  update(id: string, data: Record<string, unknown>): Promise<{ success: boolean }>
+  createFromDevis(devisId: string, nom: string, uniteBase: string): Promise<{ success: boolean; id?: string }>
+  delete(id: string): Promise<{ success: boolean }>
+}
+
+interface RapportAPI {
+  caParMois(annee: number): Promise<unknown[]>
+  caParClient(annee: number): Promise<unknown[]>
+  topArticles(annee: number): Promise<unknown[]>
+  resume(annee: number): Promise<Record<string, unknown>>
+  anneesDisponibles(): Promise<number[]>
+  exportPdf(annee: number): Promise<{ success: boolean; path?: string; message?: string }>
+}
+
+interface ExportAPI {
+  facturesCsv(): Promise<{ success: boolean; path?: string; count?: number }>
+  catalogueImportCsv(): Promise<{ success: boolean; count?: number; error?: string }>
+  catalogueExportCsv(): Promise<{ success: boolean; path?: string; count?: number; error?: string }>
+}
+
+interface TemplateAPI {
+  list(): Promise<unknown[]>
+  get(id: string): Promise<unknown>
+  createFromDevis(devisId: string, nom: string): Promise<{ success: boolean; error?: string }>
+  delete(id: string): Promise<{ success: boolean }>
+}
+
+interface UpdaterAPI {
+  check(): Promise<void>
+  download(): Promise<void>
+  install(): Promise<void>
+  onUpdate(callback: (event: string, data: unknown) => void): () => void
 }
 
 interface API {
   clients: ClientAPI
   devis: DevisAPI
   factures: FactureAPI
+  paiements: PaiementsAPI
   catalogue: CatalogueAPI
+  forfaits: ForfaitsAPI
   settings: SettingsAPI
   license: LicenseAPI
   backup: BackupAPI
   dashboard: DashboardAPI
+  rapport: RapportAPI
+  export: ExportAPI
+  templates: TemplateAPI
+  updater: UpdaterAPI
+  onSaveError(callback: (data: { message: string }) => void): () => void
 }
 
 declare global {

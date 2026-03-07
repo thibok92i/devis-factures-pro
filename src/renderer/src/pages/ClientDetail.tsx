@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, FileText, Receipt, Pencil, Plus, Mail, Phone, MapPin } from 'lucide-react'
+import { ArrowLeft, FileText, Receipt, Pencil, Plus, Mail, Phone, MapPin, Building2, Clock } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import ClientForm from '../components/ClientForm'
 import {
@@ -50,7 +50,11 @@ export default function ClientDetail() {
   const handleEditSave = async (data: Partial<Client>) => {
     if (!id) return
     try {
-      await window.api.clients.update(id, data)
+      const result = await window.api.clients.update(id, data)
+      if (result && typeof result === 'object' && 'success' in result && !result.success) {
+        toast.error(String((result as Record<string, unknown>).error || 'Erreur de validation'))
+        return
+      }
       toast.success('Client mis à jour')
       setEditing(false)
       loadData()
@@ -155,6 +159,15 @@ export default function ClientDetail() {
                 <p className="text-sm text-foreground">{client.email}</p>
               </div>
             )}
+            {(client.numero_ide || client.numero_tva) && (
+              <div className="flex items-start gap-2">
+                <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div>
+                  {client.numero_ide && <p className="text-sm text-foreground">IDE: {client.numero_ide}</p>}
+                  {client.numero_tva && <p className="text-sm text-foreground">TVA: {client.numero_tva}</p>}
+                </div>
+              </div>
+            )}
             {client.notes && (
               <div>
                 <span className="text-xs font-medium uppercase text-muted-foreground/70">Notes</span>
@@ -194,90 +207,64 @@ export default function ClientDetail() {
         </div>
       </div>
 
-      {/* Devis section */}
-      <div className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="wood-accent w-4" />
-          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
-            Devis
-          </h2>
-        </div>
-        <div className="card overflow-hidden p-0">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border" style={{ background: 'hsl(var(--muted) / 0.5)' }}>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">N°</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Statut</th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {devis.map((d) => (
-                <tr key={d.id} className="table-row cursor-pointer" onClick={() => navigate(`/devis/${d.id}`)}>
-                  <td className="px-4 py-3 font-medium text-primary">{d.numero}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(d.date)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`badge ${devisStatutColor(d.statut)}`}>{devisStatutLabel(d.statut)}</span>
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium text-foreground">{formatCHF(d.total)}</td>
-                </tr>
-              ))}
-              {devis.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                    Aucun devis pour ce client
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Factures section */}
+      {/* Chronological timeline */}
       <div>
         <div className="flex items-center gap-2 mb-4">
           <div className="wood-accent w-4" />
           <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <Receipt className="h-5 w-5" style={{ color: 'hsl(145 60% 40%)' }} />
-            Factures
+            <Clock className="h-5 w-5 text-primary" />
+            Historique
           </h2>
         </div>
-        <div className="card overflow-hidden p-0">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border" style={{ background: 'hsl(var(--muted) / 0.5)' }}>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">N°</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Échéance</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Statut</th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {factures.map((f) => (
-                <tr key={f.id} className="table-row cursor-pointer" onClick={() => navigate(`/factures/${f.id}`)}>
-                  <td className="px-4 py-3 font-medium text-primary">{f.numero}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(f.date)}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(f.echeance)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`badge ${factureStatutColor(f.statut)}`}>{factureStatutLabel(f.statut)}</span>
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium text-foreground">{formatCHF(f.total)}</td>
-                </tr>
+        {(() => {
+          const timeline = [
+            ...devis.map(d => ({ type: 'devis' as const, date: d.date, id: d.id, numero: d.numero, statut: d.statut, total: d.total })),
+            ...factures.map(f => ({ type: 'facture' as const, date: f.date, id: f.id, numero: f.numero, statut: f.statut, total: f.total }))
+          ].sort((a, b) => b.date.localeCompare(a.date))
+
+          if (timeline.length === 0) {
+            return (
+              <div className="card text-center py-8">
+                <Clock className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Aucun document pour ce client</p>
+              </div>
+            )
+          }
+
+          return (
+            <div className="space-y-2">
+              {timeline.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => navigate(item.type === 'devis' ? `/devis/${item.id}` : `/factures/${item.id}`)}
+                  className="card card-hover cursor-pointer flex items-center gap-4 py-3"
+                >
+                  <div className="shrink-0">
+                    {item.type === 'devis' ? (
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'hsl(var(--primary) / 0.1)' }}>
+                        <FileText className="h-4 w-4 text-primary" />
+                      </div>
+                    ) : (
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'hsl(145 60% 40% / 0.1)' }}>
+                        <Receipt className="h-4 w-4" style={{ color: 'hsl(145 60% 40%)' }} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-primary">{item.numero}</span>
+                      <span className={`badge ${item.type === 'devis' ? devisStatutColor(item.statut) : factureStatutColor(item.statut)}`}>
+                        {item.type === 'devis' ? devisStatutLabel(item.statut) : factureStatutLabel(item.statut)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{formatDate(item.date)}</p>
+                  </div>
+                  <span className="text-sm font-semibold text-foreground shrink-0">{formatCHF(item.total)}</span>
+                </div>
               ))}
-              {factures.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                    Aucune facture pour ce client
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Edit modal */}

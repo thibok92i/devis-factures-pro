@@ -29,16 +29,15 @@ export default function Clients() {
     try {
       if (editing) {
         await execute(() => window.api.clients.update(editing.id, data))
-        toast.success('Client mis à jour')
       } else {
         await execute(() => window.api.clients.create(data))
-        toast.success('Client créé avec succès')
       }
+      toast.success(editing ? 'Client mis à jour' : 'Client créé avec succès')
       setEditing(null)
       setCreating(false)
       refresh()
-    } catch {
-      toast.error('Erreur lors de l\'opération')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de l\'opération')
     }
   }
 
@@ -48,8 +47,8 @@ export default function Clients() {
         await execute(() => window.api.clients.delete(id))
         toast.success('Client supprimé')
         refresh()
-      } catch {
-        toast.error('Erreur lors de l\'opération')
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Erreur lors de l\'opération')
       }
     }
   }

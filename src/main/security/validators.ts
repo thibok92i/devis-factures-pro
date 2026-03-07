@@ -145,6 +145,8 @@ export interface ValidatedClient {
   ville: string
   telephone: string | null
   email: string | null
+  numero_ide: string | null
+  numero_tva: string | null
   notes: string | null
 }
 
@@ -159,6 +161,8 @@ export function validateClient(data: Record<string, unknown>): ValidatedClient {
     ville: optionalString(data.ville, 'Ville', 100) || '',
     telephone: optionalPhone(data.telephone, 'Téléphone'),
     email: optionalEmail(data.email, 'Email'),
+    numero_ide: optionalString(data.numero_ide, 'N° IDE', 15),
+    numero_tva: optionalString(data.numero_tva, 'N° TVA', 20),
     notes: optionalString(data.notes, 'Notes', 2000)
   }
 }
@@ -167,6 +171,7 @@ export interface ValidatedDevisCreate {
   client_id: string
   date: string
   validite: string
+  objet: string | null
   notes: string | null
   conditions: string | null
 }
@@ -179,6 +184,7 @@ export function validateDevisCreate(data: Record<string, unknown>): ValidatedDev
     client_id: requireUUID(data.client_id, 'Client'),
     date: optionalDate(data.date, 'Date') || today,
     validite: optionalDate(data.validite, 'Validité') || validite30,
+    objet: optionalString(data.objet, 'Objet', 500),
     notes: optionalString(data.notes, 'Notes', 5000),
     conditions: optionalString(data.conditions, 'Conditions', 5000)
   }
@@ -189,6 +195,7 @@ export interface ValidatedDevisUpdate {
   date: string
   validite: string
   statut: string
+  objet: string | null
   notes: string | null
   conditions: string | null
 }
@@ -200,6 +207,7 @@ export function validateDevisUpdate(data: Record<string, unknown>): ValidatedDev
     date: requireDate(data.date, 'Date'),
     validite: requireDate(data.validite, 'Validité'),
     statut: requireEnum(data.statut, 'Statut', ['brouillon', 'envoye', 'accepte', 'refuse']),
+    objet: optionalString(data.objet, 'Objet', 500),
     notes: optionalString(data.notes, 'Notes', 5000),
     conditions: optionalString(data.conditions, 'Conditions', 5000)
   }
@@ -212,6 +220,7 @@ export interface ValidatedLigne {
   unite: string
   quantite: number
   prix_unitaire: number
+  is_option: number
 }
 
 export function validateLigne(data: Record<string, unknown>, index: number): ValidatedLigne {
@@ -223,7 +232,8 @@ export function validateLigne(data: Record<string, unknown>, index: number): Val
     description: optionalString(data.description, `Ligne ${index + 1} - Description`, 2000),
     unite: optionalString(data.unite, `Ligne ${index + 1} - Unité`, 20) || 'pce',
     quantite: requireNumber(data.quantite, `Ligne ${index + 1} - Quantité`, 0, 999999),
-    prix_unitaire: requireNumber(data.prix_unitaire, `Ligne ${index + 1} - Prix unitaire`, 0, 9999999)
+    prix_unitaire: requireNumber(data.prix_unitaire, `Ligne ${index + 1} - Prix unitaire`, 0, 9999999),
+    is_option: data.is_option ? 1 : 0
   }
 }
 
@@ -239,6 +249,8 @@ export interface ValidatedCatalogueItem {
   designation: string
   unite: string
   prix_unitaire: number
+  prix_achat: number | null
+  fournisseur: string | null
   categorie: string | null
 }
 
@@ -250,6 +262,8 @@ export function validateCatalogueItem(data: Record<string, unknown>): ValidatedC
     designation: requireString(data.designation, 'Désignation', 300),
     unite: optionalString(data.unite, 'Unité', 20) || 'pce',
     prix_unitaire: requireNumber(data.prix_unitaire, 'Prix unitaire', 0, 9999999),
+    prix_achat: data.prix_achat != null && data.prix_achat !== '' && Number(data.prix_achat) > 0 ? requireNumber(data.prix_achat, 'Prix achat', 0, 9999999) : null,
+    fournisseur: optionalString(data.fournisseur, 'Fournisseur', 100),
     categorie: optionalString(data.categorie, 'Catégorie', 100)
   }
 }

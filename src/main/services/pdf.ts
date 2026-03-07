@@ -38,8 +38,10 @@ export async function generatePdf(
   }
 }
 
-export function getDefaultExportPath(type: 'devis' | 'facture', numero: string): string {
+export function getDefaultExportPath(type: 'devis' | 'facture' | 'rapport', numero: string): string {
   const documentsPath = app.getPath('documents')
-  const exportDir = join(documentsPath, 'DevisPro', type === 'devis' ? 'Devis' : 'Factures')
-  return join(exportDir, `${type === 'devis' ? 'Devis' : 'Facture'}_${numero}.pdf`)
+  const folders: Record<string, string> = { devis: 'Devis', facture: 'Factures', rapport: 'Rapports' }
+  const prefixes: Record<string, string> = { devis: 'Devis', facture: 'Facture', rapport: 'Rapport' }
+  const exportDir = join(documentsPath, 'DevisPro', folders[type])
+  return join(exportDir, `${prefixes[type]}_${numero}.pdf`)
 }

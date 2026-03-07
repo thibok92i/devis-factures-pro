@@ -7,16 +7,25 @@ export function useApiCall<T>() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const execute = useCallback(async (fn: () => Promise<T>): Promise<T | null> => {
+  const execute = useCallback(async (fn: () => Promise<T>): Promise<T> => {
     setLoading(true)
     setError(null)
     try {
       const result = await fn()
+      // Detect backend validation errors ({ success: false, error: "..." })
+      if (
+        result != null &&
+        typeof result === 'object' &&
+        'success' in (result as object) &&
+        (result as Record<string, unknown>).success === false
+      ) {
+        throw new Error(String((result as Record<string, unknown>).error || 'Erreur de validation'))
+      }
       return result
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Une erreur est survenue'
       setError(message)
-      return null
+      throw err
     } finally {
       setLoading(false)
     }

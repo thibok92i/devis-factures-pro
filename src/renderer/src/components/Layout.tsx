@@ -27,13 +27,41 @@ export default function Layout() {
     return () => cleanup?.()
   }, [])
 
+  // Sidebar collapsed state (persisted in localStorage)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('sidebar_collapsed') === 'true'
+  })
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed(prev => {
+      localStorage.setItem('sidebar_collapsed', String(!prev))
+      return !prev
+    })
+  }
+
   // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Ctrl+N → Nouveau devis (from anywhere)
+      // Don't trigger shortcuts when typing in inputs
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return
+
+      // Ctrl+Shift+N → Nouveau client
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'N') {
+        e.preventDefault()
+        navigate('/clients?action=new')
+        return
+      }
+      // Ctrl+N → Nouveau devis
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
         e.preventDefault()
         navigate('/devis?action=new')
+        return
+      }
+      // Ctrl+B → Toggle sidebar
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        e.preventDefault()
+        toggleSidebar()
       }
     }
     window.addEventListener('keydown', handler)
@@ -42,7 +70,7 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'hsl(var(--background))' }}>
-      <Sidebar />
+      <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
       <main className="flex-1 overflow-auto">
         {/* Top bar */}
         <div

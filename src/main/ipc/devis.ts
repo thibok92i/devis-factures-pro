@@ -50,9 +50,9 @@ export function registerDevisHandlers(): void {
     }
 
     execute(
-        `INSERT INTO devis (id, numero, client_id, date, validite, statut, notes, conditions)
-         VALUES (?, ?, ?, ?, ?, 'brouillon', ?, ?)`,
-        [id, numero, v.client_id, v.date, v.validite, v.notes, conditions]
+        `INSERT INTO devis (id, numero, client_id, date, validite, statut, objet, notes, conditions)
+         VALUES (?, ?, ?, ?, ?, 'brouillon', ?, ?, ?)`,
+        [id, numero, v.client_id, v.date, v.validite, v.objet, v.notes, conditions]
       )
       saveToFile()
       return { id, numero }
@@ -66,8 +66,8 @@ export function registerDevisHandlers(): void {
     try {
       const validId = requireUUID(id, 'ID devis')
       const v = validateDevisUpdate(data)
-      execute(`UPDATE devis SET client_id=?, date=?, validite=?, statut=?, notes=?, conditions=?, updated_at=datetime('now') WHERE id=?`,
-        [v.client_id, v.date, v.validite, v.statut, v.notes, v.conditions, validId])
+      execute(`UPDATE devis SET client_id=?, date=?, validite=?, statut=?, objet=?, notes=?, conditions=?, updated_at=datetime('now') WHERE id=?`,
+        [v.client_id, v.date, v.validite, v.statut, v.objet, v.notes, v.conditions, validId])
       saveToFile()
       return { success: true }
     } catch (err) {
@@ -99,11 +99,11 @@ export function registerDevisHandlers(): void {
       for (let i = 0; i < validLignes.length; i++) {
         const l = validLignes[i]
         const lineTotal = l.quantite * l.prix_unitaire
-        sousTotal += lineTotal
+        if (!l.is_option) sousTotal += lineTotal
         execute(
-          `INSERT INTO devis_lignes (id, devis_id, catalogue_item_id, designation, description, unite, quantite, prix_unitaire, total, ordre)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [uuid(), validId, l.catalogue_item_id, l.designation, l.description, l.unite, l.quantite, l.prix_unitaire, lineTotal, i]
+          `INSERT INTO devis_lignes (id, devis_id, catalogue_item_id, designation, description, unite, quantite, prix_unitaire, total, ordre, is_option)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [uuid(), validId, l.catalogue_item_id, l.designation, l.description, l.unite, l.quantite, l.prix_unitaire, lineTotal, i, l.is_option]
         )
       }
       const devis = queryOne('SELECT remise_pourcent, taux_tva FROM devis WHERE id = ?', [validId]) as { remise_pourcent: number; taux_tva: number }
@@ -171,18 +171,18 @@ export function registerDevisHandlers(): void {
       const validite = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
 
       execute(
-        `INSERT INTO devis (id, numero, client_id, date, validite, statut, notes, conditions, remise_pourcent, taux_tva, sous_total, remise_montant, montant_tva, total)
-         VALUES (?, ?, ?, ?, ?, 'brouillon', ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [newId, newNumero, original.client_id, today, validite, original.notes || null, original.conditions || null,
+        `INSERT INTO devis (id, numero, client_id, date, validite, statut, objet, notes, conditions, remise_pourcent, taux_tva, sous_total, remise_montant, montant_tva, total)
+         VALUES (?, ?, ?, ?, ?, 'brouillon', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [newId, newNumero, original.client_id, today, validite, original.objet || null, original.notes || null, original.conditions || null,
          original.remise_pourcent || 0, original.taux_tva || 0, original.sous_total || 0, original.remise_montant || 0, original.montant_tva || 0, original.total || 0]
       )
 
       for (let i = 0; i < lignes.length; i++) {
         const l = lignes[i]
         execute(
-          `INSERT INTO devis_lignes (id, devis_id, catalogue_item_id, designation, description, unite, quantite, prix_unitaire, total, ordre)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [uuid(), newId, l.catalogue_item_id || null, l.designation, l.description || null, l.unite || 'pce', l.quantite, l.prix_unitaire, l.total, i]
+          `INSERT INTO devis_lignes (id, devis_id, catalogue_item_id, designation, description, unite, quantite, prix_unitaire, total, ordre, is_option)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [uuid(), newId, l.catalogue_item_id || null, l.designation, l.description || null, l.unite || 'pce', l.quantite, l.prix_unitaire, l.total, i, l.is_option || 0]
         )
       }
 

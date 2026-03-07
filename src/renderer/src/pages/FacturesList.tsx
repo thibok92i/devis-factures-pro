@@ -43,27 +43,39 @@ export default function FacturesList() {
     return matchesSearch && matchesStatus
   })
 
-  const totalEncaisse = allFactures.filter((f: FactureWithClient) => f.statut === 'payee').reduce((sum: number, f: FactureWithClient) => sum + f.total, 0)
-  const totalEnAttente = allFactures.filter((f: FactureWithClient) => f.statut !== 'payee').reduce((sum: number, f: FactureWithClient) => sum + f.total, 0)
+  const totalEncaisse = allFactures.reduce((sum: number, f: FactureWithClient) => sum + (f.montant_paye || 0), 0)
+  const totalEnAttente = allFactures.reduce((sum: number, f: FactureWithClient) => sum + Math.max(0, f.total - (f.montant_paye || 0)), 0)
   const overdueCount = allFactures.filter((f: FactureWithClient) => isOverdue(f)).length
 
   const handleDelete = async (id: string) => {
     if (confirm('Supprimer cette facture ?')) {
-      await execute(() => window.api.factures.delete(id))
-      refresh()
-      toast.success('Facture supprimée')
+      try {
+        await execute(() => window.api.factures.delete(id))
+        refresh()
+        toast.success('Facture supprimée')
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Erreur lors de la suppression')
+      }
     }
   }
 
   const handleMarkPaid = async (id: string) => {
-    await execute(() => window.api.factures.updateStatut(id, 'payee'))
-    refresh()
-    toast.success('Facture marquée comme payée')
+    try {
+      await execute(() => window.api.factures.updateStatut(id, 'payee'))
+      refresh()
+      toast.success('Facture marquée comme payée')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de la mise à jour')
+    }
   }
 
   const handleExportPdf = async (id: string) => {
-    await execute(() => window.api.factures.exportPdf(id))
-    toast.success('PDF exporté')
+    try {
+      await execute(() => window.api.factures.exportPdf(id))
+      toast.success('PDF exporté')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de l\'export')
+    }
   }
 
   const handleExportCsv = async () => {
@@ -81,14 +93,18 @@ export default function FacturesList() {
 
   const handleMarkOverdue = async () => {
     const overdueFactures = allFactures.filter((f: FactureWithClient) => isOverdue(f) && f.statut === 'envoyee')
-    for (const f of overdueFactures) {
-      await execute(() => window.api.factures.updateStatut(f.id, 'en_retard'))
-    }
-    if (overdueFactures.length > 0) {
-      refresh()
-      toast.success(`${overdueFactures.length} facture(s) marquée(s) en retard`)
-    } else {
-      toast.info('Aucune facture en retard à mettre à jour')
+    try {
+      for (const f of overdueFactures) {
+        await execute(() => window.api.factures.updateStatut(f.id, 'en_retard'))
+      }
+      if (overdueFactures.length > 0) {
+        refresh()
+        toast.success(`${overdueFactures.length} facture(s) marquée(s) en retard`)
+      } else {
+        toast.info('Aucune facture en retard à mettre à jour')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de la mise à jour')
     }
   }
 
@@ -174,6 +190,7 @@ export default function FacturesList() {
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground tracking-wider">Échéance</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground tracking-wider">Statut</th>
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground tracking-wider">Total</th>
+                <th className="px-4 py-3 text-center text-xs font-medium uppercase text-muted-foreground tracking-wider">Payé</th>
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -195,6 +212,24 @@ export default function FacturesList() {
                       <span className={`badge ${factureStatutColor(f.statut)}`}>{factureStatutLabel(f.statut)}</span>
                     </td>
                     <td className="px-4 py-3 text-right font-medium text-foreground">{formatCHF(f.total)}</td>
+                    <td className="px-4 py-3">
+                      {f.statut !== 'brouillon' && f.total > 0 ? (
+                        <div className="flex flex-col items-center gap-1">
+                          <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: 'hsl(var(--muted))' }}>
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${Math.min(100, ((f.montant_paye || 0) / f.total) * 100)}%`,
+                                background: (f.montant_paye || 0) >= f.total ? 'hsl(145 60% 40%)' : 'hsl(35 80% 50%)',
+                              }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground">{Math.round(((f.montant_paye || 0) / f.total) * 100)}%</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground text-center block">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => handleExportPdf(f.id)} className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-primary transition-colors" title="PDF">
@@ -215,7 +250,7 @@ export default function FacturesList() {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center">
+                  <td colSpan={8} className="px-4 py-12 text-center">
                     <Receipt className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
                     <p className="text-sm text-muted-foreground">Aucune facture trouvée</p>
                   </td>

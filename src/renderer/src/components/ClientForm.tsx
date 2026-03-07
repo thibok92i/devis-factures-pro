@@ -19,6 +19,8 @@ export default function ClientForm({ client, onSave, onCancel, inline }: ClientF
     ville: client?.ville || '',
     telephone: client?.telephone || '',
     email: client?.email || '',
+    numero_ide: client?.numero_ide || '',
+    numero_tva: client?.numero_tva || '',
     notes: client?.notes || ''
   })
 
@@ -65,6 +67,16 @@ export default function ClientForm({ client, onSave, onCancel, inline }: ClientF
         <div>
           <label className="label">Email</label>
           <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label">N° IDE</label>
+          <input className="input" value={form.numero_ide} onChange={(e) => setForm({ ...form, numero_ide: e.target.value })} placeholder="CHE-123.456.789" />
+        </div>
+        <div>
+          <label className="label">N° TVA</label>
+          <input className="input" value={form.numero_tva} onChange={(e) => setForm({ ...form, numero_tva: e.target.value })} placeholder="CHE-123.456.789 TVA" />
         </div>
       </div>
       {!inline && (

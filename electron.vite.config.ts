@@ -10,7 +10,9 @@ export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
     define: {
-      'process.env.LICENSE_KEY_SECRET': JSON.stringify(env.LICENSE_KEY_SECRET || 'DPro-artisan-suisse-2024-clef')
+      'process.env.LICENSE_SERVER_URL': JSON.stringify(
+        env.LICENSE_SERVER_URL || 'https://devispro-license.vercel.app/api'
+      )
     }
   },
   preload: {

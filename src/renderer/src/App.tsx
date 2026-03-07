@@ -10,6 +10,7 @@ import DevisEditor from './pages/DevisEditor'
 import FacturesList from './pages/FacturesList'
 import FactureView from './pages/FactureView'
 import Catalogue from './pages/Catalogue'
+import Forfaits from './pages/Forfaits'
 import Rapports from './pages/Rapports'
 import Settings from './pages/Settings'
 
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="factures" element={<FacturesList />} />
             <Route path="factures/:id" element={<FactureView />} />
             <Route path="catalogue" element={<Catalogue />} />
+            <Route path="forfaits" element={<Forfaits />} />
             <Route path="rapports" element={<Rapports />} />
             <Route path="settings" element={<Settings />} />
           </Route>

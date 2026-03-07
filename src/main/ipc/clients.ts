@@ -23,9 +23,9 @@ export function registerClientHandlers(): void {
       const v = validateClient(data)
       const id = uuid()
       execute(
-        `INSERT INTO clients (id, nom, prenom, entreprise, adresse, npa, ville, telephone, email, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, v.nom, v.prenom, v.entreprise, v.adresse, v.npa, v.ville, v.telephone, v.email, v.notes]
+        `INSERT INTO clients (id, nom, prenom, entreprise, adresse, npa, ville, telephone, email, numero_ide, numero_tva, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, v.nom, v.prenom, v.entreprise, v.adresse, v.npa, v.ville, v.telephone, v.email, v.numero_ide, v.numero_tva, v.notes]
       )
       saveToFile()
       return queryOne('SELECT * FROM clients WHERE id = ?', [id])
@@ -41,8 +41,8 @@ export function registerClientHandlers(): void {
       const v = validateClient(data)
       execute(
         `UPDATE clients SET nom=?, prenom=?, entreprise=?, adresse=?, npa=?, ville=?,
-         telephone=?, email=?, notes=?, updated_at=datetime('now') WHERE id=?`,
-        [v.nom, v.prenom, v.entreprise, v.adresse, v.npa, v.ville, v.telephone, v.email, v.notes, validId]
+         telephone=?, email=?, numero_ide=?, numero_tva=?, notes=?, updated_at=datetime('now') WHERE id=?`,
+        [v.nom, v.prenom, v.entreprise, v.adresse, v.npa, v.ville, v.telephone, v.email, v.numero_ide, v.numero_tva, v.notes, validId]
       )
       saveToFile()
       return queryOne('SELECT * FROM clients WHERE id = ?', [validId])

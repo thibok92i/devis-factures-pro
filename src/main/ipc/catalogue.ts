@@ -33,8 +33,8 @@ export function registerCatalogueHandlers(): void {
       const v = validateCatalogueItem(data)
       const id = uuid()
       execute(
-        `INSERT INTO catalogue (id, type, reference, designation, unite, prix_unitaire, categorie) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [id, v.type, v.reference, v.designation, v.unite, v.prix_unitaire, v.categorie]
+        `INSERT INTO catalogue (id, type, reference, designation, unite, prix_unitaire, prix_achat, fournisseur, categorie) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, v.type, v.reference, v.designation, v.unite, v.prix_unitaire, v.prix_achat, v.fournisseur, v.categorie]
       )
       saveToFile()
       return queryOne('SELECT * FROM catalogue WHERE id = ?', [id])
@@ -49,8 +49,8 @@ export function registerCatalogueHandlers(): void {
       const validId = requireUUID(id, 'ID article')
       const v = validateCatalogueItem(data)
       execute(
-        `UPDATE catalogue SET type=?, reference=?, designation=?, unite=?, prix_unitaire=?, categorie=?, updated_at=datetime('now') WHERE id=?`,
-        [v.type, v.reference, v.designation, v.unite, v.prix_unitaire, v.categorie, validId]
+        `UPDATE catalogue SET type=?, reference=?, designation=?, unite=?, prix_unitaire=?, prix_achat=?, fournisseur=?, categorie=?, updated_at=datetime('now') WHERE id=?`,
+        [v.type, v.reference, v.designation, v.unite, v.prix_unitaire, v.prix_achat, v.fournisseur, v.categorie, validId]
       )
       saveToFile()
       return queryOne('SELECT * FROM catalogue WHERE id = ?', [validId])

@@ -169,13 +169,23 @@ export function generateDevisHtml(
   lignes: Record<string, unknown>[],
   settings: Record<string, string>
 ): string {
-  const linesHtml = lignes
-    .map(
-      (l) => {
-        if (l.description === '__SECTION__') {
-          return `<tr><td colspan="6" style="background: #eef2ff; padding: 8px 10px; font-weight: bold; font-size: 10pt; color: #2563eb; border-bottom: 2px solid #2563eb;">${l.designation}</td></tr>`
-        }
-        return `
+  // Build lines HTML with section subtotals and options
+  const mainLines: string[] = []
+  const optionLines: string[] = []
+  let sectionTotal = 0
+  let inSection = false
+  for (let i = 0; i < lignes.length; i++) {
+    const l = lignes[i]
+    if (l.description === '__SECTION__') {
+      // Close previous section with subtotal
+      if (inSection && sectionTotal > 0) {
+        mainLines.push(`<tr><td colspan="5" style="text-align: right; font-size: 8pt; color: #6b7280; padding: 2px 10px; border-top: 1px solid #e5e7eb;">Sous-total section</td><td class="text-right" style="font-size: 8pt; font-weight: 600; color: #2563eb; padding: 2px 10px; border-top: 1px solid #e5e7eb;">${formatCHF(sectionTotal)}</td></tr>`)
+      }
+      mainLines.push(`<tr><td colspan="6" style="background: #eef2ff; padding: 8px 10px; font-weight: bold; font-size: 10pt; color: #2563eb; border-bottom: 2px solid #2563eb;">${l.designation}</td></tr>`)
+      sectionTotal = 0
+      inSection = true
+    } else if (l.is_option) {
+      optionLines.push(`
     <tr>
       <td>${l.designation}</td>
       <td>${l.description || ''}</td>
@@ -183,11 +193,31 @@ export function generateDevisHtml(
       <td>${l.unite}</td>
       <td class="text-right">${formatCHF(l.prix_unitaire as number)}</td>
       <td class="text-right">${formatCHF(l.total as number)}</td>
-    </tr>
-  `
-      }
-    )
-    .join('')
+    </tr>`)
+    } else {
+      mainLines.push(`
+    <tr>
+      <td>${l.designation}</td>
+      <td>${l.description || ''}</td>
+      <td class="text-right">${l.quantite}</td>
+      <td>${l.unite}</td>
+      <td class="text-right">${formatCHF(l.prix_unitaire as number)}</td>
+      <td class="text-right">${formatCHF(l.total as number)}</td>
+    </tr>`)
+      if (inSection) sectionTotal += (l.total as number) || 0
+    }
+  }
+  // Close last section
+  if (inSection && sectionTotal > 0) {
+    mainLines.push(`<tr><td colspan="5" style="text-align: right; font-size: 8pt; color: #6b7280; padding: 2px 10px; border-top: 1px solid #e5e7eb;">Sous-total section</td><td class="text-right" style="font-size: 8pt; font-weight: 600; color: #2563eb; padding: 2px 10px; border-top: 1px solid #e5e7eb;">${formatCHF(sectionTotal)}</td></tr>`)
+  }
+  const linesHtml = mainLines.join('')
+  const optionsTotalHT = lignes.filter(l => l.is_option).reduce((s, l) => s + ((l.total as number) || 0), 0)
+  const optionsHtml = optionLines.length > 0 ? `
+    <tr><td colspan="6" style="background: #fffbeb; padding: 8px 10px; font-weight: bold; font-size: 10pt; color: #d97706; border-bottom: 2px solid #d97706; border-top: 2px solid #d97706;">Options</td></tr>
+    ${optionLines.join('')}
+    <tr><td colspan="5" style="text-align: right; font-weight: 600; padding: 4px 10px; color: #d97706;">Total options HT</td><td class="text-right" style="font-weight: 600; color: #d97706;">${formatCHF(optionsTotalHT)}</td></tr>
+  ` : ''
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8">${baseStyles()}</head><body>
     <div class="header">
@@ -208,6 +238,8 @@ export function generateDevisHtml(
         ${devis.validite ? `<p style="margin-top: 6px; padding: 4px 8px; background: #eff6ff; border-radius: 4px; font-size: 9pt; color: #2563eb; font-weight: 600;">Valable jusqu'au: ${formatDate(devis.validite as string)}</p>` : ''}
       </div>
     </div>
+
+    ${devis.objet ? `<p style="margin: 12px 0 4px; font-size: 11pt;"><strong>Objet:</strong> ${devis.objet}</p>` : ''}
 
     <div class="meta-grid">
       <div class="meta-box">
@@ -230,7 +262,7 @@ export function generateDevisHtml(
           <th class="text-right">Total</th>
         </tr>
       </thead>
-      <tbody>${linesHtml}</tbody>
+      <tbody>${linesHtml}${optionsHtml}</tbody>
     </table>
 
     <div class="totals">

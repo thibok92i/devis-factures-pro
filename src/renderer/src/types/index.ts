@@ -12,6 +12,8 @@ export interface Client {
   ville: string
   telephone?: string
   email?: string
+  numero_ide?: string
+  numero_tva?: string
   notes?: string
   created_at: string
   updated_at: string
@@ -24,6 +26,8 @@ export interface CatalogueItem {
   designation: string
   unite: string
   prix_unitaire: number
+  prix_achat?: number
+  fournisseur?: string
   categorie?: string
   is_favorite?: number
   created_at: string
@@ -43,6 +47,7 @@ export interface Devis {
   total: number
   remise_pourcent: number
   remise_montant: number
+  objet?: string
   notes?: string
   conditions?: string
   created_at: string
@@ -66,6 +71,7 @@ export interface DevisLigne {
   prix_unitaire: number
   total: number
   ordre: number
+  is_option?: number
 }
 
 export interface DevisDetail extends DevisWithClient {
@@ -91,11 +97,22 @@ export interface Facture {
   total: number
   remise_pourcent: number
   remise_montant: number
+  montant_paye: number
   notes?: string
   conditions?: string
   date_paiement?: string
   created_at: string
   updated_at: string
+}
+
+export interface Paiement {
+  id: string
+  facture_id: string
+  montant: number
+  date: string
+  methode: string
+  notes?: string
+  created_at: string
 }
 
 export interface FactureWithClient extends Facture {
@@ -115,6 +132,7 @@ export interface FactureLigne {
   prix_unitaire: number
   total: number
   ordre: number
+  is_option?: number
 }
 
 export interface FactureDetail extends FactureWithClient {
@@ -124,6 +142,7 @@ export interface FactureDetail extends FactureWithClient {
   client_telephone?: string
   client_email?: string
   lignes: FactureLigne[]
+  paiements: Paiement[]
 }
 
 export interface DashboardStats {

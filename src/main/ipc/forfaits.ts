@@ -170,6 +170,52 @@ export function registerForfaitHandlers(): void {
     }
   })
 
+  // Update a forfait
+  ipcMain.handle('forfaits:update', (_event, id: string, data: Record<string, unknown>) => {
+    try {
+      const validId = requireString(id, 'ID forfait', 50)
+      if (!data || typeof data !== 'object') throw new ValidationError('Données forfait invalides')
+      const nom = requireString(data.nom, 'Nom', 200)
+      const description = optionalString(data.description, 'Description', 1000)
+      const unite_base = optionalString(data.unite_base, 'Unité de base', 20) || 'm²'
+
+      execute(
+        `UPDATE forfaits SET nom=?, description=?, unite_base=?, updated_at=datetime('now') WHERE id=?`,
+        [nom, description, unite_base, validId]
+      )
+
+      // Replace lines if provided
+      const lignes = data.lignes
+      if (Array.isArray(lignes)) {
+        execute('DELETE FROM forfait_lignes WHERE forfait_id = ?', [validId])
+        for (let i = 0; i < lignes.length; i++) {
+          const l = lignes[i] as Record<string, unknown>
+          const lineId = uuid()
+          execute(
+            `INSERT INTO forfait_lignes (id, forfait_id, catalogue_item_id, designation, description, unite, ratio, prix_unitaire, ordre)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              lineId, validId,
+              l.catalogue_item_id ? requireString(l.catalogue_item_id, 'Article', 50) : null,
+              requireString(l.designation, `Ligne ${i + 1} - Désignation`, 500),
+              optionalString(l.description, `Ligne ${i + 1} - Description`, 2000),
+              optionalString(l.unite, `Ligne ${i + 1} - Unité`, 20) || 'pce',
+              requireNumber(l.ratio, `Ligne ${i + 1} - Ratio`, 0, 99999),
+              requireNumber(l.prix_unitaire, `Ligne ${i + 1} - Prix`, 0, 9999999),
+              i
+            ]
+          )
+        }
+      }
+
+      saveToFile()
+      return { success: true }
+    } catch (err) {
+      if (err instanceof ValidationError) return { success: false, error: err.message }
+      throw err
+    }
+  })
+
   // Delete a forfait
   ipcMain.handle('forfaits:delete', (_event, id: string) => {
     try {

@@ -44,8 +44,16 @@ const api = {
     updateStatut: (id: string, statut: string) =>
       ipcRenderer.invoke('factures:updateStatut', id, statut),
     exportPdf: (id: string) => ipcRenderer.invoke('factures:exportPdf', id),
+    exportRelance: (id: string) => ipcRenderer.invoke('factures:exportRelance', id),
     checkOverdue: () => ipcRenderer.invoke('factures:checkOverdue'),
     overdue: () => ipcRenderer.invoke('factures:overdue')
+  },
+
+  // Paiements
+  paiements: {
+    list: (factureId: string) => ipcRenderer.invoke('paiements:list', factureId),
+    add: (data: Record<string, unknown>) => ipcRenderer.invoke('paiements:add', data),
+    delete: (id: string) => ipcRenderer.invoke('paiements:delete', id)
   },
 
   // Catalogue
@@ -93,6 +101,8 @@ const api = {
     calculate: (id: string, quantite: number) =>
       ipcRenderer.invoke('forfaits:calculate', id, quantite),
     create: (data: Record<string, unknown>) => ipcRenderer.invoke('forfaits:create', data),
+    update: (id: string, data: Record<string, unknown>) =>
+      ipcRenderer.invoke('forfaits:update', id, data),
     createFromDevis: (devisId: string, nom: string, uniteBase: string) =>
       ipcRenderer.invoke('forfaits:createFromDevis', devisId, nom, uniteBase),
     delete: (id: string) => ipcRenderer.invoke('forfaits:delete', id)
@@ -121,13 +131,15 @@ const api = {
     caParClient: (annee: number) => ipcRenderer.invoke('rapport:caParClient', annee),
     topArticles: (annee: number) => ipcRenderer.invoke('rapport:topArticles', annee),
     resume: (annee: number) => ipcRenderer.invoke('rapport:resume', annee),
-    anneesDisponibles: () => ipcRenderer.invoke('rapport:anneesDisponibles')
+    anneesDisponibles: () => ipcRenderer.invoke('rapport:anneesDisponibles'),
+    exportPdf: (annee: number) => ipcRenderer.invoke('rapport:exportPdf', annee)
   },
 
   // Export
   export: {
     facturesCsv: () => ipcRenderer.invoke('export:facturesCsv'),
-    catalogueImportCsv: () => ipcRenderer.invoke('catalogue:importCsv')
+    catalogueImportCsv: () => ipcRenderer.invoke('catalogue:importCsv'),
+    catalogueExportCsv: () => ipcRenderer.invoke('catalogue:exportCsv')
   },
 
   // Save error listener

@@ -8,6 +8,7 @@ import { encryptBuffer, decryptBuffer, isEncrypted } from '../security/crypto'
 let db: Database | null = null
 let dbPath: string = ''
 let saveInterval: ReturnType<typeof setInterval> | null = null
+let debouncedSaveTimer: ReturnType<typeof setTimeout> | null = null
 let consecutiveSaveErrors = 0
 
 export function getDbPath(): string {
@@ -125,7 +126,14 @@ export function queryOne(sql: string, params: unknown[] = []): Record<string, un
   return queryAll(sql, params)[0]
 }
 
-/** Execute a statement (INSERT, UPDATE, DELETE) */
+/** Execute a statement (INSERT, UPDATE, DELETE) and schedule immediate disk persist */
 export function execute(sql: string, params: unknown[] = []): void {
   getDb().run(sql, params)
+  // Debounced save: writes to disk within 500ms after the last write operation.
+  // This ensures batched operations (e.g. devis + lines) trigger only one save.
+  if (debouncedSaveTimer) clearTimeout(debouncedSaveTimer)
+  debouncedSaveTimer = setTimeout(() => {
+    debouncedSaveTimer = null
+    saveToFile()
+  }, 500)
 }

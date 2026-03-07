@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2, Save, Download, ArrowRight, Search, ChevronUp, ChevronDown, Check, Package, Calculator, X, Copy, GripVertical, Star, FileInput, RefreshCw, Layers } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Save, Download, ArrowRight, Search, ChevronUp, ChevronDown, Check, Package, Calculator, X, Copy, GripVertical, Star, FileInput, RefreshCw, Layers, ToggleLeft, ToggleRight, ChevronRight, ChevronsUpDown } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { formatCHF, formatDate, devisStatutLabel, devisStatutColor, clientDisplayName } from '../utils/format'
 import ClientSearchInput from '../components/ClientSearchInput'
@@ -14,6 +14,7 @@ interface EditableLigne {
   unite: string
   quantite: number
   prix_unitaire: number
+  is_option?: boolean
 }
 
 export default function DevisEditor() {
@@ -63,20 +64,56 @@ export default function DevisEditor() {
           description: l.description || '',
           unite: l.unite,
           quantite: l.quantite,
-          prix_unitaire: l.prix_unitaire
+          prix_unitaire: l.prix_unitaire,
+          is_option: !!l.is_option
         }))
       )
     })
     window.api.catalogue.list().then(setCatalogue)
   }, [id])
 
-  const sousTotal = lignes.reduce((sum, l) => sum + l.quantite * l.prix_unitaire, 0)
+  const sousTotal = lignes.reduce((sum, l) => {
+    if (isSection(l) || l.is_option) return sum
+    return sum + l.quantite * l.prix_unitaire
+  }, 0)
+  const optionsTotal = lignes.reduce((sum, l) => {
+    if (isSection(l) || !l.is_option) return sum
+    return sum + l.quantite * l.prix_unitaire
+  }, 0)
   const remisePourcent = devis?.remise_pourcent || 0
   const remiseMontant = sousTotal * (remisePourcent / 100)
   const apresRemise = sousTotal - remiseMontant
   const tauxTva = devis?.taux_tva || 8.1
   const montantTva = apresRemise * (tauxTva / 100)
   const total = apresRemise + montantTva
+
+  // Expanded descriptions state
+  const [expandedDescs, setExpandedDescs] = useState<Set<number>>(new Set())
+  const toggleDesc = (index: number) => {
+    setExpandedDescs(prev => {
+      const next = new Set(prev)
+      if (next.has(index)) next.delete(index); else next.add(index)
+      return next
+    })
+  }
+
+  // Compute section subtotals for display
+  const sectionSubtotals = (() => {
+    const result: Record<number, number> = {}
+    let currentSectionIndex = -1
+    let runningTotal = 0
+    for (let i = 0; i < lignes.length; i++) {
+      if (isSection(lignes[i])) {
+        if (currentSectionIndex >= 0) result[currentSectionIndex] = runningTotal
+        currentSectionIndex = i
+        runningTotal = 0
+      } else if (currentSectionIndex >= 0 && !lignes[i].is_option) {
+        runningTotal += lignes[i].quantite * lignes[i].prix_unitaire
+      }
+    }
+    if (currentSectionIndex >= 0) result[currentSectionIndex] = runningTotal
+    return result
+  })()
 
   // --- Section helper ---
   const isSection = (ligne: EditableLigne) => ligne.description === '__SECTION__'
@@ -180,6 +217,7 @@ export default function DevisEditor() {
         date: devis.date,
         validite: devis.validite,
         statut: devis.statut,
+        objet: devis.objet || '',
         notes: devis.notes || '',
         conditions: devis.conditions || ''
       })
@@ -229,6 +267,15 @@ export default function DevisEditor() {
     if (!devis) return
     setSaving(true)
     try {
+      await window.api.devis.update(devis.id, {
+        client_id: devis.client_id,
+        date: devis.date,
+        validite: devis.validite,
+        statut: devis.statut,
+        objet: devis.objet || '',
+        notes: devis.notes || '',
+        conditions: devis.conditions || ''
+      })
       await window.api.devis.saveLignes(devis.id, lignes)
       const updated = await window.api.devis.get(devis.id)
       setDevis(updated)
@@ -395,6 +442,46 @@ export default function DevisEditor() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
+  // --- Auto-save (debounced 5s after last change) ---
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isInitialLoad = useRef(true)
+
+  useEffect(() => {
+    // Skip auto-save on initial load
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false
+      return
+    }
+    if (!devis || saving) return
+
+    setAutoSaveStatus('idle')
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(async () => {
+      try {
+        setAutoSaveStatus('saving')
+        await window.api.devis.update(devis.id, {
+          client_id: devis.client_id,
+          date: devis.date,
+          validite: devis.validite,
+          statut: devis.statut,
+          objet: devis.objet || '',
+          notes: devis.notes || '',
+          conditions: devis.conditions || ''
+        })
+        await window.api.devis.saveLignes(devis.id, lignes)
+        setAutoSaveStatus('saved')
+        setTimeout(() => setAutoSaveStatus('idle'), 2000)
+      } catch {
+        setAutoSaveStatus('idle')
+      }
+    }, 5000)
+
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    }
+  }, [lignes, devis?.objet, devis?.notes, devis?.conditions, devis?.date, devis?.validite])
+
   const filteredCatalogue = catalogue.filter((item) =>
     item.designation.toLowerCase().includes(catalogueSearch.toLowerCase()) ||
     item.reference.toLowerCase().includes(catalogueSearch.toLowerCase())
@@ -427,6 +514,12 @@ export default function DevisEditor() {
                 <RefreshCw className="h-3.5 w-3.5" />
               </button>
             </p>
+            <input
+              className="mt-1 w-full text-sm bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/50 focus:ring-0 p-0"
+              placeholder="Objet du devis (ex: Rénovation cuisine)..."
+              value={devis.objet || ''}
+              onChange={(e) => setDevis({ ...devis, objet: e.target.value })}
+            />
           </div>
           <span className={`badge ${devisStatutColor(devis.statut)}`}>{devisStatutLabel(devis.statut)}</span>
         </div>
@@ -454,6 +547,15 @@ export default function DevisEditor() {
             <Download className="h-4 w-4" />
             PDF
           </button>
+          {autoSaveStatus === 'saved' && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <Check className="h-3 w-3" style={{ color: 'hsl(145 60% 40%)' }} />
+              Enregistré
+            </span>
+          )}
+          {autoSaveStatus === 'saving' && (
+            <span className="text-xs text-muted-foreground">Enregistrement...</span>
+          )}
           <button onClick={handleSave} disabled={saving} className="btn-primary">
             <Save className="h-4 w-4" />
             {saving ? 'Sauvegarde...' : 'Sauvegarder'}
@@ -498,7 +600,7 @@ export default function DevisEditor() {
                         <GripVertical className="h-4 w-4" />
                       </div>
                     </td>
-                    <td colSpan={5} className="px-3 py-1.5">
+                    <td colSpan={4} className="px-3 py-1.5">
                       <div className="flex items-center gap-2">
                         <Layers className="h-4 w-4 text-primary flex-shrink-0" />
                         <input
@@ -509,6 +611,11 @@ export default function DevisEditor() {
                           placeholder="Nom de la section"
                         />
                       </div>
+                    </td>
+                    <td className="px-3 py-1.5 text-right">
+                      {sectionSubtotals[index] !== undefined && (
+                        <span className="text-xs font-semibold text-primary">{formatCHF(sectionSubtotals[index])}</span>
+                      )}
                     </td>
                     <td className="px-3 py-1.5 text-center">
                       <div className="flex gap-0.5 justify-center">
@@ -525,10 +632,12 @@ export default function DevisEditor() {
               }
 
               // --- Normal line row ---
+              const isOpt = !!ligne.is_option
               return (
+              <React.Fragment key={index}>
               <tr
-                key={index}
-                className={`hover:bg-muted/30 transition-colors ${dragOverIndex === index ? 'border-t-2 border-primary' : ''} ${dragIndex === index ? 'opacity-40' : ''}`}
+                className={`hover:bg-muted/30 transition-colors ${dragOverIndex === index ? 'border-t-2 border-primary' : ''} ${dragIndex === index ? 'opacity-40' : ''} ${isOpt ? 'opacity-60' : ''}`}
+                style={isOpt ? { borderLeft: '3px dashed hsl(var(--primary) / 0.4)' } : undefined}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDrop={(e) => handleDrop(e, index)}
               >
@@ -551,10 +660,20 @@ export default function DevisEditor() {
                   </div>
                 </td>
                 <td className="px-3 py-1.5">
-                  <input className="input text-sm" value={ligne.designation} onChange={(e) => updateLine(index, 'designation', e.target.value)} placeholder="Désignation" />
+                  <div className="flex items-center gap-1">
+                    <input className="input text-sm flex-1" value={ligne.designation} onChange={(e) => updateLine(index, 'designation', e.target.value)} placeholder="Désignation" />
+                    {isOpt && <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 flex-shrink-0">Option</span>}
+                  </div>
                 </td>
                 <td className="px-3 py-1.5">
-                  <input className="input text-sm" value={ligne.description} onChange={(e) => updateLine(index, 'description', e.target.value)} placeholder="Description" />
+                  <button
+                    onClick={() => toggleDesc(index)}
+                    className={`flex items-center gap-1 text-xs rounded px-2 py-1 transition-colors ${ligne.description ? 'text-primary bg-primary/10 hover:bg-primary/20' : 'text-muted-foreground hover:bg-muted'}`}
+                    title={ligne.description ? 'Modifier la description' : 'Ajouter une description'}
+                  >
+                    <ChevronsUpDown className="h-3 w-3" />
+                    {ligne.description ? 'Desc.' : '+ Desc.'}
+                  </button>
                 </td>
                 <td className="px-3 py-1.5">
                   <select className="input text-sm text-center" value={ligne.unite} onChange={(e) => updateLine(index, 'unite', e.target.value)}>
@@ -622,11 +741,22 @@ export default function DevisEditor() {
                 <td className="px-3 py-1.5">
                   <input className="input text-sm text-right" type="number" step="0.05" min="0" value={ligne.prix_unitaire} onChange={(e) => updateLine(index, 'prix_unitaire', parseFloat(e.target.value) || 0)} />
                 </td>
-                <td className="px-3 py-1.5 text-right font-medium text-sm text-foreground">
+                <td className={`px-3 py-1.5 text-right font-medium text-sm ${isOpt ? 'text-muted-foreground' : 'text-foreground'}`}>
                   {formatCHF(ligne.quantite * ligne.prix_unitaire)}
                 </td>
                 <td className="px-3 py-1.5 text-center">
                   <div className="flex gap-0.5 justify-center">
+                    <button
+                      onClick={() => {
+                        const updated = [...lignes]
+                        updated[index] = { ...updated[index], is_option: !updated[index].is_option }
+                        setLignes(updated)
+                      }}
+                      className={`rounded p-1 transition-colors ${isOpt ? 'text-amber-500 hover:bg-amber-500/10' : 'text-muted-foreground hover:bg-muted hover:text-amber-500'}`}
+                      title={isOpt ? 'Retirer option' : 'Marquer comme option'}
+                    >
+                      {isOpt ? <ToggleRight className="h-3.5 w-3.5" /> : <ToggleLeft className="h-3.5 w-3.5" />}
+                    </button>
                     <button onClick={() => duplicateLine(index)} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-primary transition-colors" title="Dupliquer">
                       <Copy className="h-3.5 w-3.5" />
                     </button>
@@ -636,6 +766,24 @@ export default function DevisEditor() {
                   </div>
                 </td>
               </tr>
+              {/* Expandable description row */}
+              {expandedDescs.has(index) && (
+                <tr style={isOpt ? { borderLeft: '3px dashed hsl(var(--primary) / 0.4)' } : undefined}>
+                  <td></td>
+                  <td colSpan={6} className="px-3 pb-2">
+                    <textarea
+                      className="input text-sm w-full"
+                      rows={2}
+                      placeholder="Description technique, dimensions, finitions..."
+                      value={ligne.description}
+                      onChange={(e) => updateLine(index, 'description', e.target.value)}
+                      autoFocus
+                    />
+                  </td>
+                  <td></td>
+                </tr>
+              )}
+              </React.Fragment>
               )
             })}
           </tbody>
@@ -708,6 +856,18 @@ export default function DevisEditor() {
               <span className="font-semibold text-foreground">Total TTC</span>
               <span className="text-lg font-bold text-primary">{formatCHF(total)}</span>
             </div>
+            {optionsTotal > 0 && (
+              <div className="border-t border-border pt-2 mt-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-amber-600 font-medium">Options</span>
+                  <span className="text-amber-600 font-medium">+{formatCHF(optionsTotal)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
+                  <span>Total avec options</span>
+                  <span>{formatCHF(total + optionsTotal * (1 + tauxTva / 100) * (1 - remisePourcent / 100))}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

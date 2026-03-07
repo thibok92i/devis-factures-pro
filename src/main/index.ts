@@ -6,6 +6,7 @@ import { initDatabase, closeDb } from './database'
 import { registerAllHandlers } from './ipc'
 import { startAutoBackup, stopAutoBackup } from './services/backup'
 import { initAutoUpdater } from './services/updater'
+import { checkAndNotify } from './services/notifications'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -160,6 +161,9 @@ app.whenReady().then(async () => {
   if (mainWindow) {
     initAutoUpdater(mainWindow)
   }
+
+  // Check for overdue invoices / expiring devis and show desktop notifications
+  checkAndNotify()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
