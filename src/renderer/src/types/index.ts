@@ -153,6 +153,7 @@ export interface DashboardStats {
   factureStats: Array<{ statut: string; count: number; total: number }>
   chiffreAffaires: number
   enAttente: number
+  materialLabor: { materiaux: number; mainOeuvre: number }
 }
 
 // ============================================================

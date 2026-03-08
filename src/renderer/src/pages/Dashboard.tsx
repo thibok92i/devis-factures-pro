@@ -486,26 +486,18 @@ export default function Dashboard() {
               })()}
             </div>
 
-            {/* Devis par statut — donut chart */}
+            {/* Matériaux / Main d'œuvre — donut chart */}
             <div className="card">
-              <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">Répartition devis</h3>
+              <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">Matériaux / Main d'œuvre</h3>
               {(() => {
-                const statuts = stats.devisStats.filter(s => s.count > 0)
-                const totalCount = statuts.reduce((s, d) => s + d.count, 0)
-                if (totalCount === 0) return <p className="text-sm text-muted-foreground">Aucun devis</p>
+                const { materiaux, mainOeuvre } = stats.materialLabor || { materiaux: 0, mainOeuvre: 0 }
+                const grandTotal = materiaux + mainOeuvre
+                if (grandTotal === 0) return <p className="text-sm text-muted-foreground">Aucune donnée</p>
 
-                const colors: Record<string, string> = {
-                  brouillon: 'hsl(var(--muted-foreground))',
-                  envoye: 'hsl(35 80% 50%)',
-                  accepte: 'hsl(152 45% 28%)',
-                  refuse: 'hsl(0 70% 55%)',
-                }
-                const labels: Record<string, string> = {
-                  brouillon: 'Brouillons',
-                  envoye: 'Envoyés',
-                  accepte: 'Acceptés',
-                  refuse: 'Refusés',
-                }
+                const segments = [
+                  { key: 'materiaux', label: 'Matériaux', value: materiaux, color: 'hsl(35 80% 50%)' },
+                  { key: 'main_oeuvre', label: "Main d'œuvre", value: mainOeuvre, color: 'hsl(152 45% 28%)' }
+                ].filter(s => s.value > 0)
 
                 const r = 40, cx = 55, cy = 55, stroke = 14
                 const circ = 2 * Math.PI * r
@@ -517,16 +509,16 @@ export default function Dashboard() {
                       {/* Background circle */}
                       <circle cx={cx} cy={cy} r={r} fill="none" stroke="hsl(var(--border))" strokeWidth={stroke} />
                       {/* Segments */}
-                      {statuts.map((s) => {
-                        const pct = s.count / totalCount
+                      {segments.map((s) => {
+                        const pct = s.value / grandTotal
                         const segLen = circ * pct
-                        const gap = statuts.length > 1 ? 2 : 0
+                        const gap = segments.length > 1 ? 3 : 0
                         const el = (
                           <circle
-                            key={s.statut}
+                            key={s.key}
                             cx={cx} cy={cy} r={r}
                             fill="none"
-                            stroke={colors[s.statut] || 'hsl(var(--primary))'}
+                            stroke={s.color}
                             strokeWidth={stroke}
                             strokeDasharray={`${Math.max(0, segLen - gap)} ${circ - segLen + gap}`}
                             strokeDashoffset={-offset}
@@ -537,17 +529,19 @@ export default function Dashboard() {
                         return el
                       })}
                       {/* Center text */}
-                      <text x={cx} y={cy - 2} textAnchor="middle" fontSize="16" fontWeight="700" fill="hsl(var(--foreground))">{totalCount}</text>
-                      <text x={cx} y={cy + 11} textAnchor="middle" fontSize="8" fill="hsl(var(--muted-foreground))">devis</text>
+                      <text x={cx} y={cy - 2} textAnchor="middle" fontSize="14" fontWeight="700" fill="hsl(var(--foreground))">{formatCHF(grandTotal)}</text>
+                      <text x={cx} y={cy + 11} textAnchor="middle" fontSize="7" fill="hsl(var(--muted-foreground))">{new Date().getFullYear()}</text>
                     </svg>
-                    <div className="space-y-1.5">
-                      {statuts.map((s) => {
-                        const pct = Math.round((s.count / totalCount) * 100)
+                    <div className="space-y-2">
+                      {segments.map((s) => {
+                        const pct = Math.round((s.value / grandTotal) * 100)
                         return (
-                          <div key={s.statut} className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: colors[s.statut] || 'hsl(var(--primary))' }} />
-                            <span className="text-sm text-foreground">{labels[s.statut] || s.statut}</span>
-                            <span className="text-xs text-muted-foreground ml-auto pl-2">{s.count} ({pct}%)</span>
+                          <div key={s.key} className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: s.color }} />
+                            <div>
+                              <span className="text-sm text-foreground block">{s.label}</span>
+                              <span className="text-xs text-muted-foreground">{formatCHF(s.value)} ({pct}%)</span>
+                            </div>
                           </div>
                         )
                       })}

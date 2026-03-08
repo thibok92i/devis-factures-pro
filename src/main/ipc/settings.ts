@@ -103,7 +103,41 @@ export function registerSettingsHandlers(): void {
     const factureStats = queryAll('SELECT statut, COUNT(*) as count, COALESCE(SUM(total), 0) as total FROM factures GROUP BY statut')
     const chiffreAffaires = (queryOne("SELECT COALESCE(SUM(total), 0) as total FROM factures WHERE statut = 'payee'") as { total: number }).total
     const enAttente = (queryOne("SELECT COALESCE(SUM(total), 0) as total FROM factures WHERE statut IN ('envoyee', 'en_retard')") as { total: number }).total
-    return { totalClients, devisStats, factureStats, chiffreAffaires, enAttente }
+
+    // Material vs Labor breakdown from invoiced lines (current year), fallback to devis lines
+    const currentYear = String(new Date().getFullYear())
+    let materialLaborRows = queryAll(`
+      SELECT
+        CASE WHEN fl.unite = 'h' THEN 'main_oeuvre' ELSE 'materiaux' END as type,
+        COALESCE(SUM(fl.quantite * fl.prix_unitaire), 0) as total
+      FROM facture_lignes fl
+      JOIN factures f ON fl.facture_id = f.id
+      WHERE fl.description != '__SECTION__'
+        AND COALESCE(fl.is_option, 0) != 1
+        AND strftime('%Y', f.date) = ?
+      GROUP BY type
+    `, [currentYear]) as Array<{ type: string; total: number }>
+
+    // Fallback to devis lines if no facture data
+    if (materialLaborRows.length === 0) {
+      materialLaborRows = queryAll(`
+        SELECT
+          CASE WHEN dl.unite = 'h' THEN 'main_oeuvre' ELSE 'materiaux' END as type,
+          COALESCE(SUM(dl.quantite * dl.prix_unitaire), 0) as total
+        FROM devis_lignes dl
+        JOIN devis d ON dl.devis_id = d.id
+        WHERE dl.description != '__SECTION__'
+          AND COALESCE(dl.is_option, 0) != 1
+          AND strftime('%Y', d.date) = ?
+        GROUP BY type
+      `, [currentYear]) as Array<{ type: string; total: number }>
+    }
+
+    const materiaux = materialLaborRows.find(r => r.type === 'materiaux')?.total || 0
+    const mainOeuvre = materialLaborRows.find(r => r.type === 'main_oeuvre')?.total || 0
+    const materialLabor = { materiaux, mainOeuvre }
+
+    return { totalClients, devisStats, factureStats, chiffreAffaires, enAttente, materialLabor }
   })
 
   // Monthly revenue for chart (year or last 12 months)
