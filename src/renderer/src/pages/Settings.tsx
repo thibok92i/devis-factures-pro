@@ -228,16 +228,35 @@ export default function Settings() {
           <h2 className="text-lg font-semibold text-foreground">Numérotation</h2>
         </div>
         <p className="text-sm text-muted-foreground mb-3">
-          Personnalisez les préfixes des numéros de devis et factures. Exemple : D-0001, F-0001.
+          Personnalisez les préfixes et le format des numéros de devis et factures.
         </p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-3">
           <div>
-            <label className="label">Préfixe devis</label>
-            <input className="input" value={settings.devis_prefix || 'D'} onChange={(e) => updateSetting('devis_prefix', e.target.value)} placeholder="D" maxLength={10} />
+            <label className="label">Format de numérotation</label>
+            <select
+              className="input"
+              value={settings.num_format || 'simple'}
+              onChange={(e) => updateSetting('num_format', e.target.value)}
+            >
+              <option value="simple">Simple — {settings.facture_prefix || 'F'}-0001</option>
+              <option value="year">Par année — {settings.facture_prefix || 'F'}-{new Date().getFullYear()}-0001</option>
+              <option value="full">Complet — {settings.facture_prefix || 'F'}-{new Date().getFullYear()}/{String(new Date().getMonth() + 1).padStart(2, '0')}-0001</option>
+            </select>
+            <p className="text-xs text-muted-foreground mt-1">
+              {(settings.num_format === 'year' || settings.num_format === 'full')
+                ? 'Le compteur se remet à zéro chaque année.'
+                : 'Le compteur est continu, sans remise à zéro.'}
+            </p>
           </div>
-          <div>
-            <label className="label">Préfixe facture</label>
-            <input className="input" value={settings.facture_prefix || 'F'} onChange={(e) => updateSetting('facture_prefix', e.target.value)} placeholder="F" maxLength={10} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Préfixe devis</label>
+              <input className="input" value={settings.devis_prefix || 'D'} onChange={(e) => updateSetting('devis_prefix', e.target.value)} placeholder="D" maxLength={10} />
+            </div>
+            <div>
+              <label className="label">Préfixe facture</label>
+              <input className="input" value={settings.facture_prefix || 'F'} onChange={(e) => updateSetting('facture_prefix', e.target.value)} placeholder="F" maxLength={10} />
+            </div>
           </div>
         </div>
       </div>

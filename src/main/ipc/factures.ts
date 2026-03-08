@@ -5,6 +5,7 @@ import { dirname } from 'path'
 import { queryAll, queryOne, execute, saveToFile } from '../database'
 import { generatePdf, getDefaultExportPath } from '../services/pdf'
 import { generateFactureHtml } from '../services/pdf-templates'
+import { generateNumero, getNumFormat, getPrefix } from '../utils/numbering'
 import {
   requireUUID,
   validateFactureStatut,
@@ -42,11 +43,7 @@ export function registerFactureHandlers(): void {
       if (!devis) throw new Error('Devis introuvable')
       const devisLignes = queryAll('SELECT * FROM devis_lignes WHERE devis_id = ? ORDER BY ordre', [validDevisId])
       const factureId = uuid()
-      const counter = queryOne("SELECT value FROM counters WHERE name = 'facture'") as { value: number }
-      const nextNum = counter.value + 1
-      const fPrefix = (queryOne("SELECT value FROM settings WHERE key = 'facture_prefix'") as { value: string } | undefined)?.value || 'F'
-      const numero = `${fPrefix}-${String(nextNum).padStart(4, '0')}`
-      execute("UPDATE counters SET value = ? WHERE name = 'facture'", [nextNum])
+      const numero = generateNumero('facture', getPrefix('facture_prefix', 'F'), getNumFormat())
       execute(
         `INSERT INTO factures (id, numero, devis_id, client_id, date, echeance, statut,
          sous_total, taux_tva, montant_tva, total, remise_pourcent, remise_montant, notes, conditions)
@@ -78,11 +75,7 @@ export function registerFactureHandlers(): void {
       const conditions = optionalString(data.conditions, 'Conditions', 5000)
 
       const id = uuid()
-      const counter = queryOne("SELECT value FROM counters WHERE name = 'facture'") as { value: number }
-      const nextNum = counter.value + 1
-      const fPrefix = (queryOne("SELECT value FROM settings WHERE key = 'facture_prefix'") as { value: string } | undefined)?.value || 'F'
-      const numero = `${fPrefix}-${String(nextNum).padStart(4, '0')}`
-      execute("UPDATE counters SET value = ? WHERE name = 'facture'", [nextNum])
+      const numero = generateNumero('facture', getPrefix('facture_prefix', 'F'), getNumFormat())
       execute(
         `INSERT INTO factures (id, numero, client_id, date, echeance, statut, notes, conditions) VALUES (?, ?, ?, ?, ?, 'brouillon', ?, ?)`,
         [id, numero, clientId, date, echeance, notes, conditions]
@@ -142,8 +135,9 @@ export function registerFactureHandlers(): void {
           [uuid(), validId, l.catalogue_item_id, l.designation, l.description, l.unite, l.quantite, l.prix_unitaire, lineTotal, i]
         )
       }
-      const facture = queryOne('SELECT remise_pourcent, taux_tva FROM factures WHERE id = ?', [validId]) as { remise_pourcent: number; taux_tva: number }
-      const remiseMontant = sousTotal * (facture.remise_pourcent / 100)
+      const facture = queryOne('SELECT remise_pourcent, taux_tva FROM factures WHERE id = ?', [validId]) as { remise_pourcent: number; taux_tva: number } | undefined
+      if (!facture) return { success: false, error: 'Facture introuvable' }
+      const remiseMontant = sousTotal * ((facture.remise_pourcent || 0) / 100)
       const apresRemise = sousTotal - remiseMontant
       const montantTva = apresRemise * (facture.taux_tva / 100)
       const total = apresRemise + montantTva
@@ -206,8 +200,8 @@ export function registerFactureHandlers(): void {
       const totalPaye = (queryOne('SELECT COALESCE(SUM(montant), 0) as total FROM paiements WHERE facture_id = ?', [factureId]) as { total: number }).total
       execute("UPDATE factures SET montant_paye = ?, updated_at = datetime('now') WHERE id = ?", [totalPaye, factureId])
       // Auto-mark as payee if fully paid
-      const facture = queryOne('SELECT total FROM factures WHERE id = ?', [factureId]) as { total: number }
-      if (totalPaye >= facture.total) {
+      const facture = queryOne('SELECT total FROM factures WHERE id = ?', [factureId]) as { total: number } | undefined
+      if (facture && totalPaye >= facture.total) {
         execute("UPDATE factures SET statut = 'payee', date_paiement = ?, updated_at = datetime('now') WHERE id = ?", [date, factureId])
       }
       saveToFile()
@@ -337,6 +331,49 @@ export function registerFactureHandlers(): void {
     await generatePdf(html, filePath)
     shell.openPath(filePath)
     return { success: true, path: filePath }
+  })
+
+  // --- Create credit note (avoir) ---
+  ipcMain.handle('factures:createAvoir', (_event, factureId: string) => {
+    try {
+      const validId = requireUUID(factureId, 'ID facture')
+      const facture = queryOne('SELECT * FROM factures WHERE id = ?', [validId]) as Record<string, unknown>
+      if (!facture) return { success: false, error: 'Facture introuvable' }
+      const lignes = queryAll('SELECT * FROM facture_lignes WHERE facture_id = ? ORDER BY ordre', [validId]) as Array<Record<string, unknown>>
+
+      const avoirId = uuid()
+      const numero = generateNumero('facture', 'A', getNumFormat())
+
+      execute(
+        `INSERT INTO factures (id, numero, devis_id, client_id, date, echeance, statut,
+         sous_total, taux_tva, montant_tva, total, remise_pourcent, remise_montant, notes, conditions, type, facture_reference_id)
+         VALUES (?, ?, NULL, ?, date('now'), date('now'), 'brouillon', ?, ?, ?, ?, ?, ?, ?, ?, 'avoir', ?)`,
+        [avoirId, numero, facture.client_id,
+         -(Number(facture.sous_total) || 0),
+         facture.taux_tva,
+         -(Number(facture.montant_tva) || 0),
+         -(Number(facture.total) || 0),
+         facture.remise_pourcent,
+         -(Number(facture.remise_montant) || 0),
+         `Avoir pour facture ${facture.numero}`,
+         facture.conditions,
+         validId]
+      )
+
+      for (const l of lignes) {
+        execute(
+          `INSERT INTO facture_lignes (id, facture_id, catalogue_item_id, designation, description, unite, quantite, prix_unitaire, total, ordre)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [uuid(), avoirId, l.catalogue_item_id, l.designation, l.description, l.unite,
+           -(Number(l.quantite) || 0), l.prix_unitaire, -(Number(l.total) || 0), l.ordre]
+        )
+      }
+      saveToFile()
+      return { success: true, id: avoirId, numero }
+    } catch (err) {
+      if (err instanceof ValidationError) return { success: false, error: err.message }
+      throw err
+    }
   })
 
   ipcMain.handle('factures:exportPdf', async (_event, id: string) => {

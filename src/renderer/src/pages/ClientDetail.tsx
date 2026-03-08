@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, FileText, Receipt, Pencil, Plus, Mail, Phone, MapPin, Building2, Clock } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import { SkeletonList } from '../components/Skeleton'
+import Breadcrumbs from '../components/Breadcrumbs'
 import ClientForm from '../components/ClientForm'
 import {
   formatCHF,
@@ -63,16 +65,7 @@ export default function ClientDetail() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm">Chargement...</p>
-        </div>
-      </div>
-    )
-  }
+  if (loading) return <SkeletonList />
 
   if (!client) {
     return (
@@ -88,6 +81,8 @@ export default function ClientDetail() {
 
   return (
     <div>
+      <Breadcrumbs items={[{ label: 'Clients', to: '/clients' }, { label: clientDisplayName(client) }]} />
+
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">

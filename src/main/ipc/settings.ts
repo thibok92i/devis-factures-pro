@@ -106,8 +106,22 @@ export function registerSettingsHandlers(): void {
     return { totalClients, devisStats, factureStats, chiffreAffaires, enAttente }
   })
 
-  // Monthly revenue for chart (last 12 months)
-  ipcMain.handle('dashboard:monthlyRevenue', () => {
+  // Monthly revenue for chart (year or last 12 months)
+  ipcMain.handle('dashboard:monthlyRevenue', (_event, annee?: number) => {
+    if (annee && Number.isFinite(annee)) {
+      const y = Number(annee)
+      const rows = queryAll(`
+        SELECT
+          strftime('%Y-%m', date) as mois,
+          COALESCE(SUM(CASE WHEN statut = 'payee' THEN total ELSE 0 END), 0) as encaisse,
+          COALESCE(SUM(total), 0) as facture
+        FROM factures
+        WHERE strftime('%Y', date) = ?
+        GROUP BY strftime('%Y-%m', date)
+        ORDER BY mois ASC
+      `, [String(y)])
+      return rows
+    }
     const rows = queryAll(`
       SELECT
         strftime('%Y-%m', date) as mois,
@@ -421,6 +435,78 @@ export function registerSettingsHandlers(): void {
     const csv = '\uFEFF' + csvRows.join('\n') // BOM for Excel UTF-8
     const { filePath } = await dialog.showSaveDialog({
       defaultPath: `export-factures-${new Date().toISOString().slice(0, 10)}.csv`,
+      filters: [{ name: 'CSV', extensions: ['csv'] }]
+    })
+    if (!filePath) return { success: false, message: 'Export annulé' }
+    writeFileSync(filePath, csv, 'utf-8')
+    return { success: true, path: filePath, count: factures.length }
+  })
+
+  // ============================================================
+  // Export comptable (format Crésus / Banana / Abacus)
+  // ============================================================
+
+  ipcMain.handle('export:facturesComptable', async (_event, dateFrom?: string, dateTo?: string) => {
+    let whereClause = "WHERE f.statut != 'brouillon'"
+    const params: string[] = []
+    if (dateFrom) { whereClause += ' AND f.date >= ?'; params.push(dateFrom) }
+    if (dateTo) { whereClause += ' AND f.date <= ?'; params.push(dateTo) }
+
+    const factures = queryAll(`
+      SELECT f.numero, f.date, f.sous_total, f.taux_tva, f.montant_tva, f.total,
+             f.remise_montant, f.type,
+             c.nom as client_nom, c.prenom as client_prenom, c.entreprise as client_entreprise
+      FROM factures f LEFT JOIN clients c ON f.client_id = c.id
+      ${whereClause}
+      ORDER BY f.date ASC
+    `, params) as Record<string, unknown>[]
+
+    if (factures.length === 0) return { success: false, error: 'Aucune facture à exporter pour cette période' }
+
+    const headers = ['Date', 'N° pièce', 'Libellé', 'Débit', 'Crédit', 'Compte', 'Code TVA']
+    const csvRows = [headers.join(';')]
+
+    for (const f of factures) {
+      const clientName = f.client_entreprise
+        ? String(f.client_entreprise)
+        : [f.client_prenom, f.client_nom].filter(Boolean).join(' ')
+      const isAvoir = f.type === 'avoir'
+      const montantHT = Math.abs(Number(f.sous_total) - Number(f.remise_montant))
+      const montantTVA = Math.abs(Number(f.montant_tva))
+      const montantTTC = Math.abs(Number(f.total))
+      const tauxTva = Number(f.taux_tva)
+
+      // Écriture comptable double (débit/crédit)
+      // Facture : Débit 1100 (Débiteurs) / Crédit 3000 (Produits) + 2200 (TVA due)
+      // Avoir :   Crédit 1100 (Débiteurs) / Débit 3000 (Produits) + 2200 (TVA due)
+      const row = (libelle: string, debit: string, credit: string, compte: string, codeTva: string) =>
+        [f.date, f.numero, libelle, debit, credit, compte, codeTva]
+          .map(v => `"${String(v).replace(/"/g, '""')}"`)
+          .join(';')
+
+      if (!isAvoir) {
+        // Débit Débiteurs
+        csvRows.push(row(`${clientName} - ${f.numero}`, montantTTC.toFixed(2), '', '1100', ''))
+        // Crédit Produits (HT)
+        csvRows.push(row(`${clientName} - ${f.numero}`, '', montantHT.toFixed(2), '3000', tauxTva > 0 ? `TVA ${tauxTva}%` : ''))
+        // Crédit TVA due
+        if (montantTVA > 0) {
+          csvRows.push(row(`TVA ${f.numero}`, '', montantTVA.toFixed(2), '2200', `TVA ${tauxTva}%`))
+        }
+      } else {
+        // Avoir = écritures inversées
+        csvRows.push(row(`Avoir ${clientName} - ${f.numero}`, '', montantTTC.toFixed(2), '1100', ''))
+        csvRows.push(row(`Avoir ${clientName} - ${f.numero}`, montantHT.toFixed(2), '', '3000', tauxTva > 0 ? `TVA ${tauxTva}%` : ''))
+        if (montantTVA > 0) {
+          csvRows.push(row(`TVA avoir ${f.numero}`, montantTVA.toFixed(2), '', '2200', `TVA ${tauxTva}%`))
+        }
+      }
+    }
+
+    const csv = '\uFEFF' + csvRows.join('\n')
+    const period = dateFrom && dateTo ? `${dateFrom}_${dateTo}` : new Date().toISOString().slice(0, 10)
+    const { filePath } = await dialog.showSaveDialog({
+      defaultPath: `export-comptable-${period}.csv`,
       filters: [{ name: 'CSV', extensions: ['csv'] }]
     })
     if (!filePath) return { success: false, message: 'Export annulé' }

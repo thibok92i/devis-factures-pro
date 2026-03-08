@@ -5,6 +5,7 @@ import { dirname } from 'path'
 import { queryAll, queryOne, execute, saveToFile } from '../database'
 import { generatePdf, getDefaultExportPath } from '../services/pdf'
 import { generateDevisHtml } from '../services/pdf-templates'
+import { generateNumero, getNumFormat, getPrefix } from '../utils/numbering'
 import {
   validateDevisCreate,
   validateDevisUpdate,
@@ -37,11 +38,7 @@ export function registerDevisHandlers(): void {
     try {
       const v = validateDevisCreate(data)
       const id = uuid()
-      const counter = queryOne("SELECT value FROM counters WHERE name = 'devis'") as { value: number }
-      const nextNum = counter.value + 1
-      const prefix = (queryOne("SELECT value FROM settings WHERE key = 'devis_prefix'") as { value: string } | undefined)?.value || 'D'
-      const numero = `${prefix}-${String(nextNum).padStart(4, '0')}`
-      execute("UPDATE counters SET value = ? WHERE name = 'devis'", [nextNum])
+      const numero = generateNumero('devis', getPrefix('devis_prefix', 'D'), getNumFormat())
       // Feature 3: Auto-fill conditions from settings if not provided
     let conditions = v.conditions
     if (!conditions) {
@@ -101,15 +98,16 @@ export function registerDevisHandlers(): void {
         const lineTotal = l.quantite * l.prix_unitaire
         if (!l.is_option) sousTotal += lineTotal
         execute(
-          `INSERT INTO devis_lignes (id, devis_id, catalogue_item_id, designation, description, unite, quantite, prix_unitaire, total, ordre, is_option)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [uuid(), validId, l.catalogue_item_id, l.designation, l.description, l.unite, l.quantite, l.prix_unitaire, lineTotal, i, l.is_option]
+          `INSERT INTO devis_lignes (id, devis_id, catalogue_item_id, designation, description, unite, quantite, prix_unitaire, total, ordre, is_option, note_interne)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [uuid(), validId, l.catalogue_item_id, l.designation, l.description, l.unite, l.quantite, l.prix_unitaire, lineTotal, i, l.is_option, l.note_interne || null]
         )
       }
-      const devis = queryOne('SELECT remise_pourcent, taux_tva FROM devis WHERE id = ?', [validId]) as { remise_pourcent: number; taux_tva: number }
-      const remiseMontant = sousTotal * (devis.remise_pourcent / 100)
+      const devis = queryOne('SELECT remise_pourcent, taux_tva FROM devis WHERE id = ?', [validId]) as { remise_pourcent: number; taux_tva: number } | undefined
+      if (!devis) return { success: false, error: 'Devis introuvable' }
+      const remiseMontant = sousTotal * ((devis.remise_pourcent || 0) / 100)
       const apresRemise = sousTotal - remiseMontant
-      const montantTva = apresRemise * (devis.taux_tva / 100)
+      const montantTva = apresRemise * ((devis.taux_tva || 0) / 100)
       const total = apresRemise + montantTva
       execute(`UPDATE devis SET sous_total=?, remise_montant=?, montant_tva=?, total=?, updated_at=datetime('now') WHERE id=?`,
         [sousTotal, remiseMontant, montantTva, total, validId])
@@ -125,8 +123,9 @@ export function registerDevisHandlers(): void {
     try {
       const validId = requireUUID(devisId, 'ID devis')
       const validRemise = validateRemise(remisePourcent)
-      const devis = queryOne('SELECT sous_total, taux_tva FROM devis WHERE id = ?', [validId]) as { sous_total: number; taux_tva: number }
-      const remiseMontant = devis.sous_total * (validRemise / 100)
+      const devis = queryOne('SELECT sous_total, taux_tva FROM devis WHERE id = ?', [validId]) as { sous_total: number; taux_tva: number } | undefined
+      if (!devis) return { success: false, error: 'Devis introuvable' }
+      const remiseMontant = (devis.sous_total || 0) * (validRemise / 100)
       const apresRemise = devis.sous_total - remiseMontant
       const montantTva = apresRemise * (devis.taux_tva / 100)
       execute(`UPDATE devis SET remise_pourcent=?, remise_montant=?, montant_tva=?, total=?, updated_at=datetime('now') WHERE id=?`,
@@ -161,11 +160,7 @@ export function registerDevisHandlers(): void {
       const lignes = queryAll('SELECT * FROM devis_lignes WHERE devis_id = ? ORDER BY ordre', [validId]) as Array<Record<string, unknown>>
 
       const newId = uuid()
-      const counter = queryOne("SELECT value FROM counters WHERE name = 'devis'") as { value: number }
-      const nextNum = counter.value + 1
-      const prefix = (queryOne("SELECT value FROM settings WHERE key = 'devis_prefix'") as { value: string } | undefined)?.value || 'D'
-      const newNumero = `${prefix}-${String(nextNum).padStart(4, '0')}`
-      execute("UPDATE counters SET value = ? WHERE name = 'devis'", [nextNum])
+      const newNumero = generateNumero('devis', getPrefix('devis_prefix', 'D'), getNumFormat())
 
       const today = new Date().toISOString().slice(0, 10)
       const validite = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)

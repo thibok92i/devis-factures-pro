@@ -6,6 +6,7 @@ import {
   ArrowUpRight, Wallet, PieChart, Download
 } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import { SkeletonDashboard } from '../components/Skeleton'
 import { formatCHF } from '../utils/format'
 
 const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
@@ -224,16 +225,7 @@ export default function Rapports() {
     })
   }, [annee])
 
-  if (loading || !resume) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm">Chargement du rapport...</p>
-        </div>
-      </div>
-    )
-  }
+  if (loading || !resume) return <SkeletonDashboard />
 
   const evolution = resume.caPrev > 0
     ? ((resume.ca - resume.caPrev) / resume.caPrev * 100)

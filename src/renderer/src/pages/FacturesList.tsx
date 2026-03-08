@@ -32,6 +32,9 @@ export default function FacturesList() {
   const toast = useToast()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [showComptaExport, setShowComptaExport] = useState(false)
+  const [comptaFrom, setComptaFrom] = useState(() => `${new Date().getFullYear()}-01-01`)
+  const [comptaTo, setComptaTo] = useState(() => new Date().toISOString().slice(0, 10))
 
   const allFactures = factures || []
 
@@ -91,6 +94,20 @@ export default function FacturesList() {
     }
   }
 
+  const handleExportComptable = async () => {
+    try {
+      const result = await window.api.export.facturesComptable(comptaFrom, comptaTo)
+      if (result.success) {
+        toast.success(`${result.count} factures exportées (format comptable)`)
+        setShowComptaExport(false)
+      } else if (result.error) {
+        toast.error(result.error)
+      }
+    } catch {
+      toast.error("Erreur lors de l'export comptable")
+    }
+  }
+
   const handleMarkOverdue = async () => {
     const overdueFactures = allFactures.filter((f: FactureWithClient) => isOverdue(f) && f.statut === 'envoyee')
     try {
@@ -126,8 +143,52 @@ export default function FacturesList() {
             <FileSpreadsheet className="h-3.5 w-3.5" />
             Export CSV
           </button>
+          <button onClick={() => setShowComptaExport(true)} className="btn-secondary text-sm">
+            <Download className="h-3.5 w-3.5" />
+            Export comptable
+          </button>
         </div>
       </div>
+
+      {/* Accounting export modal */}
+      {showComptaExport && (
+        <div className="modal-overlay">
+          <div className="modal w-full max-w-sm">
+            <h3 className="text-lg font-semibold text-foreground mb-1">Export comptable</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              CSV compatible Crésus, Banana, Abacus (double écriture)
+            </p>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Du</label>
+                <input type="date" className="input mt-1" value={comptaFrom} onChange={(e) => setComptaFrom(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Au</label>
+                <input type="date" className="input mt-1" value={comptaTo} onChange={(e) => setComptaTo(e.target.value)} />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mb-4">
+              <button className="text-xs px-2 py-1 rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground" onClick={() => { const y = new Date().getFullYear(); setComptaFrom(`${y}-01-01`); setComptaTo(`${y}-12-31`) }}>
+                Cette année
+              </button>
+              <button className="text-xs px-2 py-1 rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground" onClick={() => { const y = new Date().getFullYear() - 1; setComptaFrom(`${y}-01-01`); setComptaTo(`${y}-12-31`) }}>
+                Année précédente
+              </button>
+              <button className="text-xs px-2 py-1 rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground" onClick={() => { const d = new Date(); const m = d.getMonth(); const y = d.getFullYear(); const qStart = new Date(y, Math.floor(m / 3) * 3, 1); const qEnd = new Date(y, Math.floor(m / 3) * 3 + 3, 0); setComptaFrom(qStart.toISOString().slice(0, 10)); setComptaTo(qEnd.toISOString().slice(0, 10)) }}>
+                Ce trimestre
+              </button>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowComptaExport(false)} className="btn-secondary text-sm">Annuler</button>
+              <button onClick={handleExportComptable} className="btn-primary text-sm">
+                <Download className="h-3.5 w-3.5" />
+                Exporter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -199,7 +260,10 @@ export default function FacturesList() {
                 const overdue = isOverdue(f)
                 return (
                   <tr key={f.id} className={`table-row cursor-pointer group ${overdue ? 'bg-destructive/5' : ''}`} onClick={() => navigate(`/factures/${f.id}`)}>
-                    <td className="px-4 py-3 font-medium text-primary">{f.numero}</td>
+                    <td className="px-4 py-3 font-medium text-primary">
+                      {f.numero}
+                      {f.type === 'avoir' && <span className="ml-1.5 text-xs font-bold px-1 py-0.5 rounded" style={{ background: 'hsl(0 70% 55% / 0.1)', color: 'hsl(0 70% 55%)' }}>Avoir</span>}
+                    </td>
                     <td className="px-4 py-3 text-sm text-foreground">{clientDisplayName({ nom: f.client_nom, prenom: f.client_prenom, entreprise: f.client_entreprise })}</td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(f.date)}</td>
                     <td className="px-4 py-3 text-sm">

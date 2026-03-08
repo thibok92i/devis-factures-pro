@@ -20,6 +20,8 @@
 import { autoUpdater } from 'electron-updater'
 import { BrowserWindow, ipcMain } from 'electron'
 import { is } from '@electron-toolkit/utils'
+import { saveToFile, closeDb } from '../database'
+import { performBackup } from './backup'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -88,6 +90,19 @@ export function initAutoUpdater(window: BrowserWindow): void {
   })
 
   ipcMain.handle('updater:install', () => {
+    // CRITICAL: quitAndInstall calls app.exit() internally, which does NOT
+    // trigger 'before-quit'. We must save DB + backup BEFORE quitting,
+    // otherwise any unsaved in-memory data is lost.
+    try {
+      console.log('[Updater] Saving database before update...')
+      saveToFile()
+      performBackup()
+      closeDb()
+      console.log('[Updater] Database saved. Installing update...')
+    } catch (err) {
+      console.error('[Updater] Pre-update save failed:', err)
+      // Still proceed with update — data was likely saved by auto-save
+    }
     autoUpdater.quitAndInstall(false, true)
   })
 

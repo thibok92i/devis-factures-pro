@@ -32,6 +32,7 @@ interface FactureAPI {
   updateStatut(id: string, statut: string): Promise<{ success: boolean }>
   exportPdf(id: string): Promise<{ success: boolean; path?: string; message?: string }>
   exportRelance(id: string): Promise<{ success: boolean; path?: string; message?: string; error?: string }>
+  createAvoir(factureId: string): Promise<{ success: boolean; id?: string; numero?: string; error?: string }>
   checkOverdue(): Promise<{ count: number }>
   overdue(): Promise<unknown[]>
 }
@@ -58,6 +59,7 @@ interface SettingsAPI {
   get(key: string): Promise<string | null>
   set(key: string, value: string): Promise<{ success: boolean }>
   setMultiple(settings: Record<string, string>): Promise<{ success: boolean }>
+  uploadLogo(): Promise<{ success: boolean; data?: string }>
 }
 
 interface LicenseAPI {
@@ -79,7 +81,7 @@ interface BackupAPI {
 
 interface DashboardAPI {
   stats(): Promise<DashboardStats>
-  monthlyRevenue(): Promise<unknown[]>
+  monthlyRevenue(annee?: number): Promise<unknown[]>
 }
 
 interface ForfaitsAPI {
@@ -102,7 +104,8 @@ interface RapportAPI {
 }
 
 interface ExportAPI {
-  facturesCsv(): Promise<{ success: boolean; path?: string; count?: number }>
+  facturesCsv(): Promise<{ success: boolean; path?: string; count?: number; error?: string }>
+  facturesComptable(dateFrom?: string, dateTo?: string): Promise<{ success: boolean; path?: string; count?: number; error?: string }>
   catalogueImportCsv(): Promise<{ success: boolean; count?: number; error?: string }>
   catalogueExportCsv(): Promise<{ success: boolean; path?: string; count?: number; error?: string }>
 }

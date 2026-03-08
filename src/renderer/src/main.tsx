@@ -8,8 +8,7 @@ import './index.css'
 // In browser preview (outside Electron), inject mock API
 if (!window.api) {
   import('./mock-api').then(({ mockApi }) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(window as any).api = mockApi
+    window.api = mockApi as unknown as typeof window.api
     mount()
   })
 } else {

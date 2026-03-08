@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import CommandPalette from './CommandPalette'
 import UpdateNotification from './UpdateNotification'
+import NotificationCenter from './NotificationCenter'
 
 export default function Layout() {
   const navigate = useNavigate()
@@ -85,6 +86,9 @@ export default function Layout() {
           <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             DevisPro — Gestion artisan
           </span>
+          <div className="ml-auto">
+            <NotificationCenter />
+          </div>
         </div>
 
         <div className="p-8">

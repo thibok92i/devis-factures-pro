@@ -45,6 +45,7 @@ const api = {
       ipcRenderer.invoke('factures:updateStatut', id, statut),
     exportPdf: (id: string) => ipcRenderer.invoke('factures:exportPdf', id),
     exportRelance: (id: string) => ipcRenderer.invoke('factures:exportRelance', id),
+    createAvoir: (factureId: string) => ipcRenderer.invoke('factures:createAvoir', factureId),
     checkOverdue: () => ipcRenderer.invoke('factures:checkOverdue'),
     overdue: () => ipcRenderer.invoke('factures:overdue')
   },
@@ -122,7 +123,7 @@ const api = {
   // Dashboard
   dashboard: {
     stats: () => ipcRenderer.invoke('dashboard:stats'),
-    monthlyRevenue: () => ipcRenderer.invoke('dashboard:monthlyRevenue')
+    monthlyRevenue: (annee?: number) => ipcRenderer.invoke('dashboard:monthlyRevenue', annee)
   },
 
   // Rapports
@@ -138,6 +139,7 @@ const api = {
   // Export
   export: {
     facturesCsv: () => ipcRenderer.invoke('export:facturesCsv'),
+    facturesComptable: (dateFrom?: string, dateTo?: string) => ipcRenderer.invoke('export:facturesComptable', dateFrom, dateTo),
     catalogueImportCsv: () => ipcRenderer.invoke('catalogue:importCsv'),
     catalogueExportCsv: () => ipcRenderer.invoke('catalogue:exportCsv')
   },

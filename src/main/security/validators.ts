@@ -221,6 +221,7 @@ export interface ValidatedLigne {
   quantite: number
   prix_unitaire: number
   is_option: number
+  note_interne: string | null
 }
 
 export function validateLigne(data: Record<string, unknown>, index: number): ValidatedLigne {
@@ -233,7 +234,8 @@ export function validateLigne(data: Record<string, unknown>, index: number): Val
     unite: optionalString(data.unite, `Ligne ${index + 1} - Unité`, 20) || 'pce',
     quantite: requireNumber(data.quantite, `Ligne ${index + 1} - Quantité`, 0, 999999),
     prix_unitaire: requireNumber(data.prix_unitaire, `Ligne ${index + 1} - Prix unitaire`, 0, 9999999),
-    is_option: data.is_option ? 1 : 0
+    is_option: data.is_option ? 1 : 0,
+    note_interne: optionalString(data.note_interne, `Ligne ${index + 1} - Note interne`, 1000)
   }
 }
 

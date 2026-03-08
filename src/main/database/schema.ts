@@ -1,4 +1,5 @@
 import type { Database } from 'sql.js'
+import { runMigrations } from './migrations'
 
 export function createSchema(db: Database): void {
   db.run(`
@@ -195,112 +196,8 @@ export function createSchema(db: Database): void {
     INSERT OR IGNORE INTO settings (key, value) VALUES ('delai_paiement_facture', '30');
   `)
 
-  // Migration: add checksum to licence table (for existing DBs created before v1.0.2)
-  try {
-    db.run(`ALTER TABLE licence ADD COLUMN checksum TEXT`)
-  } catch {
-    // Column already exists, ignore
-  }
-
-  // Migration: add key_hint to licence table (for displaying last 4 chars of original key)
-  try {
-    db.run(`ALTER TABLE licence ADD COLUMN key_hint TEXT`)
-  } catch {
-    // Column already exists, ignore
-  }
-
-  // Migration v1.3.0: add server license columns
-  try {
-    db.run(`ALTER TABLE licence ADD COLUMN original_key TEXT`)
-  } catch {
-    // Column already exists, ignore
-  }
-  try {
-    db.run(`ALTER TABLE licence ADD COLUMN server_token TEXT`)
-  } catch {
-    // Column already exists, ignore
-  }
-  try {
-    db.run(`ALTER TABLE licence ADD COLUMN valid_until TEXT`)
-  } catch {
-    // Column already exists, ignore
-  }
-  try {
-    db.run(`ALTER TABLE licence ADD COLUMN last_server_check TEXT`)
-  } catch {
-    // Column already exists, ignore
-  }
-
-  // Migration: add objet (title/subject) to devis
-  try {
-    db.run(`ALTER TABLE devis ADD COLUMN objet TEXT`)
-  } catch {
-    // Column already exists, ignore
-  }
-
-  // Migration: add is_favorite to catalogue (Feature 5)
-  try {
-    db.run(`ALTER TABLE catalogue ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0`)
-  } catch {
-    // Column already exists, ignore
-  }
-
-  // Migration: add prix_achat and fournisseur to catalogue (margin tracking)
-  try {
-    db.run(`ALTER TABLE catalogue ADD COLUMN prix_achat REAL`)
-  } catch {
-    // Column already exists, ignore
-  }
-  try {
-    db.run(`ALTER TABLE catalogue ADD COLUMN fournisseur TEXT`)
-  } catch {
-    // Column already exists, ignore
-  }
-
-  // Migration: add paiements table (partial payments / acomptes)
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS paiements (
-      id TEXT PRIMARY KEY,
-      facture_id TEXT NOT NULL,
-      montant REAL NOT NULL,
-      date TEXT NOT NULL DEFAULT (date('now')),
-      methode TEXT NOT NULL DEFAULT 'virement',
-      notes TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (facture_id) REFERENCES factures(id) ON DELETE CASCADE
-    )
-  `)
-
-  // Migration: add montant_paye to factures (sum of payments)
-  try {
-    db.run(`ALTER TABLE factures ADD COLUMN montant_paye REAL NOT NULL DEFAULT 0`)
-  } catch {
-    // Column already exists, ignore
-  }
-
-  // Migration: add is_option to devis_lignes (optional lines not counted in total)
-  try {
-    db.run(`ALTER TABLE devis_lignes ADD COLUMN is_option INTEGER NOT NULL DEFAULT 0`)
-  } catch {
-    // Column already exists, ignore
-  }
-  try {
-    db.run(`ALTER TABLE facture_lignes ADD COLUMN is_option INTEGER NOT NULL DEFAULT 0`)
-  } catch {
-    // Column already exists, ignore
-  }
-
-  // --- Client: IDE/TVA fields ---
-  try {
-    db.run(`ALTER TABLE clients ADD COLUMN numero_ide TEXT`)
-  } catch {
-    // Column already exists, ignore
-  }
-  try {
-    db.run(`ALTER TABLE clients ADD COLUMN numero_tva TEXT`)
-  } catch {
-    // Column already exists, ignore
-  }
+  // Run versioned migrations (ALTER TABLE, new tables, etc.)
+  runMigrations(db)
 
   // --- Catalogue par défaut : Matériaux (avec prix d'achat fournisseur Suisse Romande) ---
   db.run(`INSERT OR IGNORE INTO catalogue (id, reference, designation, type, unite, prix_unitaire, categorie, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`, ['default-BOIS-001', 'BOIS-001', 'Panneau chêne massif 20mm', 'materiau', 'm²', 89.0, 'Bois massif']);

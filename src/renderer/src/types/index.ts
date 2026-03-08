@@ -98,6 +98,8 @@ export interface Facture {
   remise_pourcent: number
   remise_montant: number
   montant_paye: number
+  type?: 'facture' | 'avoir'
+  facture_reference_id?: string
   notes?: string
   conditions?: string
   date_paiement?: string
