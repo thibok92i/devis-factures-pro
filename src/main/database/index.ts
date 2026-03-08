@@ -96,6 +96,30 @@ export function saveToFile(): void {
   }
 }
 
+/**
+ * Reload in-memory database from the encrypted file on disk.
+ * Used after backup restore to sync the in-memory state.
+ */
+export async function reloadFromFile(): Promise<void> {
+  if (!dbPath || !existsSync(dbPath)) return
+  const SQL = await initSqlJs()
+  const fileBuffer = readFileSync(dbPath)
+  if (isEncrypted(fileBuffer)) {
+    const decrypted = decryptBuffer(fileBuffer)
+    if (decrypted) {
+      if (db) db.close()
+      db = new SQL.Database(decrypted)
+      db.run('PRAGMA foreign_keys = ON')
+      console.log('[DB] Reloaded database from disk after restore')
+    }
+  } else {
+    if (db) db.close()
+    db = new SQL.Database(fileBuffer)
+    db.run('PRAGMA foreign_keys = ON')
+    console.log('[DB] Reloaded unencrypted database from disk after restore')
+  }
+}
+
 export function closeDb(): void {
   if (saveInterval) {
     clearInterval(saveInterval)

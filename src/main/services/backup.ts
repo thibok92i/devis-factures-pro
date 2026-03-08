@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'fs'
 import { join } from 'path'
-import { getDbPath } from '../database'
+import { getDbPath, reloadFromFile } from '../database'
 
 let backupInterval: ReturnType<typeof setInterval> | null = null
 
@@ -90,7 +90,7 @@ export function listBackups(): { name: string; date: string; size: number }[] {
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 }
 
-export function restoreBackup(fileName: string): { success: boolean; error?: string } {
+export async function restoreBackup(fileName: string): Promise<{ success: boolean; error?: string }> {
   try {
     const backupDir = getBackupDir()
     const backupPath = join(backupDir, fileName)
@@ -109,6 +109,10 @@ export function restoreBackup(fileName: string): { success: boolean; error?: str
 
     const dbPath = getDbPath()
     copyFileSync(backupPath, dbPath)
+
+    // Reload in-memory database from the restored file
+    await reloadFromFile()
+
     return { success: true }
   } catch (err) {
     return { success: false, error: String(err) }

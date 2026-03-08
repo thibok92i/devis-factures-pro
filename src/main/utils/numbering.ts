@@ -30,7 +30,16 @@ export function generateNumero(
   const counter = queryOne(
     `SELECT value, counter_year FROM counters WHERE name = ?`,
     [counterName]
-  ) as CounterRow
+  ) as CounterRow | undefined
+
+  if (!counter) {
+    // Counter row missing — initialize it and retry
+    execute(
+      `INSERT OR IGNORE INTO counters (name, value, counter_year) VALUES (?, 0, ?)`,
+      [counterName, currentYear]
+    )
+    return generateNumero(counterName, prefix, format)
+  }
 
   let nextNum = counter.value + 1
 

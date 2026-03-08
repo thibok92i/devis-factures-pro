@@ -429,7 +429,7 @@ export function registerSettingsHandlers(): void {
     const base64 = `data:${mime};base64,${fileBuffer.toString('base64')}`
     // Max 150KB for logo
     if (base64.length > 150000) {
-      return { success: false, error: 'Image trop volumineuse (max 100KB)' }
+      return { success: false, error: 'Image trop volumineuse (max ~110KB)' }
     }
     execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['entreprise_logo', base64])
     saveToFile()
@@ -459,8 +459,8 @@ export function registerSettingsHandlers(): void {
       const row = [
         f.numero, f.date, f.echeance, f.statut,
         clientName, f.client_entreprise || '', f.client_adresse || '', f.client_npa || '', f.client_ville || '',
-        (f.sous_total as number).toFixed(2), (f.remise_pourcent as number).toFixed(1), (f.remise_montant as number).toFixed(2),
-        (f.taux_tva as number).toFixed(1), (f.montant_tva as number).toFixed(2), (f.total as number).toFixed(2),
+        (Number(f.sous_total) || 0).toFixed(2), (Number(f.remise_pourcent) || 0).toFixed(1), (Number(f.remise_montant) || 0).toFixed(2),
+        (Number(f.taux_tva) || 0).toFixed(1), (Number(f.montant_tva) || 0).toFixed(2), (Number(f.total) || 0).toFixed(2),
         f.date_paiement || ''
       ]
       csvRows.push(row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';'))

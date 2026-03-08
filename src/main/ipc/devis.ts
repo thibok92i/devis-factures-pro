@@ -30,6 +30,7 @@ export function registerDevisHandlers(): void {
               c.npa as client_npa, c.ville as client_ville,
               c.telephone as client_telephone, c.email as client_email
        FROM devis d LEFT JOIN clients c ON d.client_id = c.id WHERE d.id = ?`, [validId])
+    if (!devis) return null
     const lignes = queryAll('SELECT * FROM devis_lignes WHERE devis_id = ? ORDER BY ordre', [validId])
     return { ...devis, lignes }
   })
@@ -127,7 +128,7 @@ export function registerDevisHandlers(): void {
       if (!devis) return { success: false, error: 'Devis introuvable' }
       const remiseMontant = (devis.sous_total || 0) * (validRemise / 100)
       const apresRemise = devis.sous_total - remiseMontant
-      const montantTva = apresRemise * (devis.taux_tva / 100)
+      const montantTva = apresRemise * ((devis.taux_tva || 0) / 100)
       execute(`UPDATE devis SET remise_pourcent=?, remise_montant=?, montant_tva=?, total=?, updated_at=datetime('now') WHERE id=?`,
         [validRemise, remiseMontant, apresRemise + montantTva, apresRemise + montantTva, validId])
       saveToFile()
@@ -190,23 +191,30 @@ export function registerDevisHandlers(): void {
   })
 
   ipcMain.handle('devis:exportPdf', async (_event, id: string) => {
-    const validId = requireUUID(id, 'ID devis')
-    const devis = queryOne(
-      `SELECT d.*, c.nom as client_nom, c.prenom as client_prenom,
-              c.entreprise as client_entreprise, c.adresse as client_adresse,
-              c.npa as client_npa, c.ville as client_ville
-       FROM devis d LEFT JOIN clients c ON d.client_id = c.id WHERE d.id = ?`, [validId]) as Record<string, unknown>
-    const lignes = queryAll('SELECT * FROM devis_lignes WHERE devis_id = ? ORDER BY ordre', [validId])
-    const settingsRows = queryAll('SELECT key, value FROM settings') as Array<{ key: string; value: string }>
-    const settings = Object.fromEntries(settingsRows.map((r) => [r.key, r.value]))
-    const html = generateDevisHtml(devis, lignes, settings)
-    const defaultPath = getDefaultExportPath('devis', devis.numero as string)
-    const { filePath } = await dialog.showSaveDialog({ defaultPath, filters: [{ name: 'PDF', extensions: ['pdf'] }] })
-    if (!filePath) return { success: false, message: 'Export annulé' }
-    const dir = dirname(filePath)
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    await generatePdf(html, filePath)
-    shell.openPath(filePath)
-    return { success: true, path: filePath }
+    try {
+      const validId = requireUUID(id, 'ID devis')
+      const devis = queryOne(
+        `SELECT d.*, c.nom as client_nom, c.prenom as client_prenom,
+                c.entreprise as client_entreprise, c.adresse as client_adresse,
+                c.npa as client_npa, c.ville as client_ville
+         FROM devis d LEFT JOIN clients c ON d.client_id = c.id WHERE d.id = ?`, [validId]) as Record<string, unknown> | undefined
+      if (!devis) return { success: false, message: 'Devis introuvable' }
+      const lignes = queryAll('SELECT * FROM devis_lignes WHERE devis_id = ? ORDER BY ordre', [validId])
+      const settingsRows = queryAll('SELECT key, value FROM settings') as Array<{ key: string; value: string }>
+      const settings = Object.fromEntries(settingsRows.map((r) => [r.key, r.value]))
+      const html = generateDevisHtml(devis, lignes, settings)
+      const defaultPath = getDefaultExportPath('devis', devis.numero as string)
+      const { filePath } = await dialog.showSaveDialog({ defaultPath, filters: [{ name: 'PDF', extensions: ['pdf'] }] })
+      if (!filePath) return { success: false, message: 'Export annulé' }
+      const dir = dirname(filePath)
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+      await generatePdf(html, filePath)
+      shell.openPath(filePath)
+      return { success: true, path: filePath }
+    } catch (err) {
+      if (err instanceof ValidationError) return { success: false, message: err.message }
+      console.error('[Devis] Export PDF error:', err)
+      return { success: false, message: 'Erreur lors de l\'export PDF' }
+    }
   })
 }

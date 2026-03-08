@@ -33,7 +33,7 @@ interface FactureAPI {
   exportPdf(id: string): Promise<{ success: boolean; path?: string; message?: string }>
   exportRelance(id: string): Promise<{ success: boolean; path?: string; message?: string; error?: string }>
   createAvoir(factureId: string): Promise<{ success: boolean; id?: string; numero?: string; error?: string }>
-  checkOverdue(): Promise<{ count: number }>
+  checkOverdue(): Promise<{ updated: number }>
   overdue(): Promise<unknown[]>
 }
 
@@ -59,7 +59,7 @@ interface SettingsAPI {
   get(key: string): Promise<string | null>
   set(key: string, value: string): Promise<{ success: boolean }>
   setMultiple(settings: Record<string, string>): Promise<{ success: boolean }>
-  uploadLogo(): Promise<{ success: boolean; data?: string }>
+  uploadLogo(): Promise<{ success: boolean; logo?: string; error?: string }>
 }
 
 interface LicenseAPI {
@@ -77,6 +77,8 @@ interface LicenseAPI {
 interface BackupAPI {
   run(): Promise<{ success: boolean; path: string }>
   getPath(): Promise<string>
+  list(): Promise<{ name: string; date: string; size: number }[]>
+  restore(fileName: string): Promise<{ success: boolean; error?: string }>
 }
 
 interface DashboardAPI {
@@ -115,6 +117,7 @@ interface TemplateAPI {
   get(id: string): Promise<unknown>
   createFromDevis(devisId: string, nom: string): Promise<{ success: boolean; error?: string }>
   delete(id: string): Promise<{ success: boolean }>
+  rename(id: string, nom: string): Promise<{ success: boolean }>
 }
 
 interface UpdaterAPI {

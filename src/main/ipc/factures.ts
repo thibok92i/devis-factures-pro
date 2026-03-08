@@ -31,6 +31,7 @@ export function registerFactureHandlers(): void {
               c.npa as client_npa, c.ville as client_ville,
               c.telephone as client_telephone, c.email as client_email
        FROM factures f LEFT JOIN clients c ON f.client_id = c.id WHERE f.id = ?`, [validId])
+    if (!facture) return null
     const lignes = queryAll('SELECT * FROM facture_lignes WHERE facture_id = ? ORDER BY ordre', [validId])
     const paiements = queryAll('SELECT * FROM paiements WHERE facture_id = ? ORDER BY date DESC', [validId])
     return { ...facture, lignes, paiements }
@@ -129,17 +130,17 @@ export function registerFactureHandlers(): void {
       for (let i = 0; i < validLignes.length; i++) {
         const l = validLignes[i]
         const lineTotal = l.quantite * l.prix_unitaire
-        sousTotal += lineTotal
+        if (!l.is_option) sousTotal += lineTotal
         execute(
-          `INSERT INTO facture_lignes (id, facture_id, catalogue_item_id, designation, description, unite, quantite, prix_unitaire, total, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [uuid(), validId, l.catalogue_item_id, l.designation, l.description, l.unite, l.quantite, l.prix_unitaire, lineTotal, i]
+          `INSERT INTO facture_lignes (id, facture_id, catalogue_item_id, designation, description, unite, quantite, prix_unitaire, total, ordre, is_option) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [uuid(), validId, l.catalogue_item_id, l.designation, l.description, l.unite, l.quantite, l.prix_unitaire, lineTotal, i, l.is_option]
         )
       }
       const facture = queryOne('SELECT remise_pourcent, taux_tva FROM factures WHERE id = ?', [validId]) as { remise_pourcent: number; taux_tva: number } | undefined
       if (!facture) return { success: false, error: 'Facture introuvable' }
       const remiseMontant = sousTotal * ((facture.remise_pourcent || 0) / 100)
       const apresRemise = sousTotal - remiseMontant
-      const montantTva = apresRemise * (facture.taux_tva / 100)
+      const montantTva = apresRemise * ((facture.taux_tva || 0) / 100)
       const total = apresRemise + montantTva
       execute(`UPDATE factures SET sous_total=?, remise_montant=?, montant_tva=?, total=?, updated_at=datetime('now') WHERE id=?`, [sousTotal, remiseMontant, montantTva, total, validId])
       saveToFile()
@@ -232,6 +233,7 @@ export function registerFactureHandlers(): void {
 
   // --- Lettre de relance (payment reminder) ---
   ipcMain.handle('factures:exportRelance', async (_event, id: string) => {
+    try {
     const validId = requireUUID(id, 'ID facture')
     const facture = queryOne(
       `SELECT f.*, c.nom as client_nom, c.prenom as client_prenom,
@@ -331,6 +333,11 @@ export function registerFactureHandlers(): void {
     await generatePdf(html, filePath)
     shell.openPath(filePath)
     return { success: true, path: filePath }
+    } catch (err) {
+      if (err instanceof ValidationError) return { success: false, error: err.message }
+      console.error('[Facture] Export relance error:', err)
+      return { success: false, error: 'Erreur lors de l\'export de la relance' }
+    }
   })
 
   // --- Create credit note (avoir) ---
@@ -377,23 +384,30 @@ export function registerFactureHandlers(): void {
   })
 
   ipcMain.handle('factures:exportPdf', async (_event, id: string) => {
-    const validId = requireUUID(id, 'ID facture')
-    const facture = queryOne(
-      `SELECT f.*, c.nom as client_nom, c.prenom as client_prenom,
-              c.entreprise as client_entreprise, c.adresse as client_adresse,
-              c.npa as client_npa, c.ville as client_ville
-       FROM factures f LEFT JOIN clients c ON f.client_id = c.id WHERE f.id = ?`, [validId]) as Record<string, unknown>
-    const lignes = queryAll('SELECT * FROM facture_lignes WHERE facture_id = ? ORDER BY ordre', [validId])
-    const settingsRows = queryAll('SELECT key, value FROM settings') as Array<{ key: string; value: string }>
-    const settings = Object.fromEntries(settingsRows.map((r) => [r.key, r.value]))
-    const html = await generateFactureHtml(facture, lignes, settings)
-    const defaultPath = getDefaultExportPath('facture', facture.numero as string)
-    const { filePath } = await dialog.showSaveDialog({ defaultPath, filters: [{ name: 'PDF', extensions: ['pdf'] }] })
-    if (!filePath) return { success: false, message: 'Export annulé' }
-    const dir = dirname(filePath)
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    await generatePdf(html, filePath)
-    shell.openPath(filePath)
-    return { success: true, path: filePath }
+    try {
+      const validId = requireUUID(id, 'ID facture')
+      const facture = queryOne(
+        `SELECT f.*, c.nom as client_nom, c.prenom as client_prenom,
+                c.entreprise as client_entreprise, c.adresse as client_adresse,
+                c.npa as client_npa, c.ville as client_ville
+         FROM factures f LEFT JOIN clients c ON f.client_id = c.id WHERE f.id = ?`, [validId]) as Record<string, unknown> | undefined
+      if (!facture) return { success: false, message: 'Facture introuvable' }
+      const lignes = queryAll('SELECT * FROM facture_lignes WHERE facture_id = ? ORDER BY ordre', [validId])
+      const settingsRows = queryAll('SELECT key, value FROM settings') as Array<{ key: string; value: string }>
+      const settings = Object.fromEntries(settingsRows.map((r) => [r.key, r.value]))
+      const html = await generateFactureHtml(facture, lignes, settings)
+      const defaultPath = getDefaultExportPath('facture', facture.numero as string)
+      const { filePath } = await dialog.showSaveDialog({ defaultPath, filters: [{ name: 'PDF', extensions: ['pdf'] }] })
+      if (!filePath) return { success: false, message: 'Export annulé' }
+      const dir = dirname(filePath)
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+      await generatePdf(html, filePath)
+      shell.openPath(filePath)
+      return { success: true, path: filePath }
+    } catch (err) {
+      if (err instanceof ValidationError) return { success: false, message: err.message }
+      console.error('[Facture] Export PDF error:', err)
+      return { success: false, message: 'Erreur lors de l\'export PDF' }
+    }
   })
 }

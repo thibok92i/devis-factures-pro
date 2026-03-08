@@ -296,7 +296,8 @@ const ALLOWED_SETTINGS_KEYS = new Set([
   'facture_prefix',
   'theme_mode',
   'mentions_devis',
-  'mentions_facture'
+  'mentions_facture',
+  'num_format'
 ])
 
 export function validateSettingsKey(key: string): string {
